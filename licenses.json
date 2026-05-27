@@ -5,5 +5,12 @@
     "machine_id": "GodZoneForce",
     "expires_at": "2027-10-27T00:00:00",
     "created_at": "2026-01-01T00:00:00"
+  },
+  {
+    "id": 2,
+    "name": "Test",
+    "machine_id": "TEST",
+    "expires_at": "2026-05-28T00:00:00",
+    "created_at": "2026-05-27T00:00:00"
   }
 ]
