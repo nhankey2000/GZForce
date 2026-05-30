@@ -37,8 +37,22 @@
   },
   {
      "id": 6,
-    "name": "Dương SOS",
+    "name": "Dương SOS Máy 1",
     "machine_id": "0FCE24685C184BDA",
+    "expires_at": "2027-10-28T00:00:00",
+    "created_at": "2026-05-27T00:00:00"
+  },
+   {
+     "id": 7,
+    "name": "Thu Det",
+    "machine_id": "04E1776FFFB1C361",
+    "expires_at": "2027-10-28T00:00:00",
+    "created_at": "2026-05-27T00:00:00"
+  },
+  {
+     "id": 8,
+    "name": "Dương SOS Máy 2",
+    "machine_id": "04E1776FFFB1C361",
     "expires_at": "2027-10-28T00:00:00",
     "created_at": "2026-05-27T00:00:00"
   }
