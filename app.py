@@ -36,6 +36,14 @@ def get_files_info():
             })
     return sorted(files, key=lambda x: x['uploaded_at'], reverse=True)
 
+def today():
+    """Trả về datetime hiện tại đã reset giờ/phút/giây về 00:00:00"""
+    return datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+def parse_date(iso_str):
+    """Parse ISO datetime string và reset về 00:00:00"""
+    return datetime.fromisoformat(iso_str).replace(hour=0, minute=0, second=0, microsecond=0)
+
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -466,19 +474,20 @@ def check_key():
     lic = next((l for l in licenses if l['machine_id'] == machine_id), None)
     if not lic:
         return jsonify({'error': 'not_found'}), 404
-    now = datetime.now()
-    expire = datetime.fromisoformat(lic['expires_at'])
-    if expire < now:
+    now    = today()
+    expire = parse_date(lic['expires_at'])
+    days_left = (expire - now).days
+    if days_left < 0:
         return jsonify({'error': 'expired'}), 403
-    return jsonify({'name': lic['name'], 'expire_in_days': (expire - now).days}), 200
+    return jsonify({'name': lic['name'], 'expire_in_days': days_left}), 200
 
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
     licenses = load_licenses()
-    now = datetime.now()
+    now = today()   # ← reset giờ về 00:00:00, tránh tính sai ngày
     result = []
     for l in licenses:
-        expire = datetime.fromisoformat(l['expires_at'])
+        expire    = parse_date(l['expires_at'])
         days_left = (expire - now).days
         result.append({**l, 'days_left': days_left, 'status': 'active' if days_left > 0 else 'expired'})
     return jsonify(result)
@@ -514,9 +523,9 @@ def extend_license(machine_id):
     licenses = load_licenses()
     for l in licenses:
         if l['machine_id'] == machine_id:
-            expire = datetime.fromisoformat(l['expires_at'])
-            now = datetime.now()
-            base = expire if expire > now else now
+            expire = parse_date(l['expires_at'])
+            now    = today()
+            base   = expire if expire > now else now
             l['expires_at'] = (base + timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%S')
             save_licenses(licenses)
             return jsonify({'success': True, 'new_expire': l['expires_at']})
