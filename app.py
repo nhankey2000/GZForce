@@ -37,11 +37,9 @@ def get_files_info():
     return sorted(files, key=lambda x: x['uploaded_at'], reverse=True)
 
 def today():
-    """Trả về datetime hiện tại đã reset giờ/phút/giây về 00:00:00"""
     return datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
 def parse_date(iso_str):
-    """Parse ISO datetime string và reset về 00:00:00"""
     return datetime.fromisoformat(iso_str).replace(hour=0, minute=0, second=0, microsecond=0)
 
 HTML = """
@@ -77,7 +75,7 @@ HTML = """
   .badge-green{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);}
   .badge-red{color:var(--red);border-color:var(--red);background:rgba(255,61,61,.08);}
   .badge-amber{color:var(--amber);border-color:var(--amber);background:rgba(255,171,0,.08);}
-  .main{max-width:1100px;margin:0 auto;padding:32px 24px;}
+  .main{max-width:1200px;margin:0 auto;padding:32px 24px;}
   .tab-page{display:none;}.tab-page.active{display:block;}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
   .stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
@@ -96,7 +94,7 @@ HTML = """
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
   .section-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--orange);}
   .card-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end;}
   .form-group{display:flex;flex-direction:column;gap:6px;}
   .form-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;}
   .form-input{background:var(--card2);border:1px solid var(--border);border-radius:6px;
@@ -127,6 +125,9 @@ HTML = """
   .status-active{color:var(--green);background:rgba(0,230,118,.1);}
   .status-expired{color:var(--red);background:rgba(255,61,61,.1);}
   .status-warn{color:var(--amber);background:rgba(255,171,0,.1);}
+  .room-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:4px;
+    font-size:12px;font-family:'Share Tech Mono',monospace;
+    color:var(--cyan);background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);}
   .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:48px;text-align:center;
     cursor:pointer;transition:all .2s;margin-bottom:16px;}
   .drop-zone:hover,.drop-zone.drag-over{border-color:var(--orange);background:rgba(255,122,0,.05);}
@@ -196,6 +197,8 @@ HTML = """
           <input class="form-input" id="inp-name" placeholder="Nguyen Van A"/></div>
         <div class="form-group"><label class="form-label">Machine ID</label>
           <input class="form-input" id="inp-mid" placeholder="GodZoneForce"/></div>
+        <div class="form-group"><label class="form-label">Tên Phòng</label>
+          <input class="form-input" id="inp-room" placeholder="Phòng 101"/></div>
         <div class="form-group"><label class="form-label">Ngày hết hạn</label>
           <input class="form-input" id="inp-expire" type="date"/></div>
         <button class="btn btn-orange" onclick="addLicense()">+ THÊM</button>
@@ -207,8 +210,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
-        <tbody id="license-tbody"><tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Tên Phòng</th><th>Hết Hạn</th><th>Còn Lại</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
+        <tbody id="license-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -301,12 +304,13 @@ function updateStats(data) {
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>';
     return;
   }
   tbody.innerHTML = data.map((l, i) => {
     const days = l.days_left;
     const expireDate = l.expires_at.split('T')[0];
+    const roomName = l.room_name || '—';
     let st, dh;
     if (days <= 0) {
       st = '<span class="status status-expired">Hết hạn</span>';
@@ -318,10 +322,14 @@ function renderLicenseTable(data) {
       st = '<span class="status status-active">Hoạt động</span>';
       dh = '<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';
     }
+    const roomHtml = roomName !== '—'
+      ? `<span class="room-badge">🏠 ${roomName}</span>`
+      : `<span style="color:var(--sub)">—</span>`;
     return `<tr>
       <td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td>
       <td style="font-weight:600">${l.name}</td>
       <td><span class="mono">${l.machine_id}</span></td>
+      <td>${roomHtml}</td>
       <td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td>
       <td>${dh}</td><td>${st}</td>
       <td><div class="actions">
@@ -335,13 +343,16 @@ function renderLicenseTable(data) {
 async function addLicense() {
   const name=document.getElementById('inp-name').value.trim();
   const mid=document.getElementById('inp-mid').value.trim();
+  const room=document.getElementById('inp-room').value.trim();
   const expire=document.getElementById('inp-expire').value;
   if(!name||!mid||!expire){showToast('Điền đầy đủ thông tin!','error');return;}
   const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name,machine_id:mid,expires_at:expire})});
+    body:JSON.stringify({name,machine_id:mid,room_name:room,expires_at:expire})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã thêm: '+name,'success');
-    document.getElementById('inp-name').value='';document.getElementById('inp-mid').value='';
+    document.getElementById('inp-name').value='';
+    document.getElementById('inp-mid').value='';
+    document.getElementById('inp-room').value='';
     loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
 }
@@ -479,12 +490,16 @@ def check_key():
     days_left = (expire - now).days
     if days_left < 0:
         return jsonify({'error': 'expired'}), 403
-    return jsonify({'name': lic['name'], 'expire_in_days': days_left}), 200
+    return jsonify({
+        'name': lic['name'],
+        'room_name': lic.get('room_name', ''),
+        'expire_in_days': days_left
+    }), 200
 
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
     licenses = load_licenses()
-    now = today()   # ← reset giờ về 00:00:00, tránh tính sai ngày
+    now = today()
     result = []
     for l in licenses:
         expire    = parse_date(l['expires_at'])
@@ -502,6 +517,7 @@ def add_license():
         'id': len(licenses) + 1,
         'name': data['name'],
         'machine_id': data['machine_id'],
+        'room_name': data.get('room_name', ''),
         'expires_at': data['expires_at'] + 'T00:00:00',
         'created_at': datetime.now().isoformat()
     }
