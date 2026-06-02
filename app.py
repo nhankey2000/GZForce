@@ -5,6 +5,7 @@ import json, os
 
 app = Flask(__name__)
 LICENSES_FILE = "licenses.json"
+CONFIG_FILE   = "config.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -18,6 +19,16 @@ def load_licenses():
 def save_licenses(licenses):
     with open(LICENSES_FILE, 'w', encoding='utf-8') as f:
         json.dump(licenses, f, ensure_ascii=False, indent=2)
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {'room_name': ''}
+    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_config(cfg):
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -65,6 +76,9 @@ HTML = """
     background:linear-gradient(90deg,var(--orange),var(--cyan));}
   .logo{font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--orange);letter-spacing:2px;}
   .logo span{color:var(--sub);font-size:13px;margin-left:8px;}
+  .logo-room{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--cyan);
+    margin-left:12px;padding:3px 10px;border:1px solid rgba(0,229,255,.3);
+    border-radius:4px;background:rgba(0,229,255,.06);}
   .nav-tabs{display:flex;gap:4px;margin-left:24px;}
   .nav-tab{padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;
     letter-spacing:1px;border:1px solid transparent;transition:all .2s;color:var(--sub);}
@@ -94,7 +108,7 @@ HTML = """
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
   .section-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--orange);}
   .card-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:12px;align-items:end;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;}
   .form-group{display:flex;flex-direction:column;gap:6px;}
   .form-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;}
   .form-input{background:var(--card2);border:1px solid var(--border);border-radius:6px;
@@ -125,9 +139,6 @@ HTML = """
   .status-active{color:var(--green);background:rgba(0,230,118,.1);}
   .status-expired{color:var(--red);background:rgba(255,61,61,.1);}
   .status-warn{color:var(--amber);background:rgba(255,171,0,.1);}
-  .room-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:4px;
-    font-size:12px;font-family:'Share Tech Mono',monospace;
-    color:var(--cyan);background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);}
   .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:48px;text-align:center;
     cursor:pointer;transition:all .2s;margin-bottom:16px;}
   .drop-zone:hover,.drop-zone.drag-over{border-color:var(--orange);background:rgba(255,122,0,.05);}
@@ -157,20 +168,30 @@ HTML = """
   .toast.show{transform:translateY(0);opacity:1;}
   .toast.success{border-color:var(--green);color:var(--green);}
   .toast.error{border-color:var(--red);color:var(--red);}
+  /* Settings */
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .setting-item{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:20px;}
+  .setting-desc{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6;}
+  .api-preview{background:var(--bg);border:1px solid var(--border);border-radius:6px;
+    padding:12px 16px;font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--cyan);
+    margin-top:12px;line-height:1.8;}
   @media(max-width:768px){
     .stats{grid-template-columns:repeat(2,1fr);}
     .form-grid{grid-template-columns:1fr;}
+    .settings-grid{grid-template-columns:1fr;}
   }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div style="display:flex;align-items:center">
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
     <div class="logo">GZF<span>PANEL</span></div>
+    <div id="header-room" class="logo-room" style="display:none"></div>
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
-      <div class="nav-tab" id="tab-btn-files" onclick="switchTab('files',this)">📦 FILES</div>
+      <div class="nav-tab" id="tab-btn-files"    onclick="switchTab('files',this)">📦 FILES</div>
+      <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings',this)">⚙ SETTINGS</div>
     </div>
   </div>
   <div class="header-right">
@@ -197,8 +218,6 @@ HTML = """
           <input class="form-input" id="inp-name" placeholder="Nguyen Van A"/></div>
         <div class="form-group"><label class="form-label">Machine ID</label>
           <input class="form-input" id="inp-mid" placeholder="GodZoneForce"/></div>
-        <div class="form-group"><label class="form-label">Tên Phòng</label>
-          <input class="form-input" id="inp-room" placeholder="Phòng 101"/></div>
         <div class="form-group"><label class="form-label">Ngày hết hạn</label>
           <input class="form-input" id="inp-expire" type="date"/></div>
         <button class="btn btn-orange" onclick="addLicense()">+ THÊM</button>
@@ -210,8 +229,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Tên Phòng</th><th>Hết Hạn</th><th>Còn Lại</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
-        <tbody id="license-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
+        <tbody id="license-tbody"><tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -240,6 +259,49 @@ HTML = """
         <thead><tr><th>#</th><th>Tên File</th><th>Dung Lượng</th><th>Upload Lúc</th><th>Download URL</th><th>Hành Động</th></tr></thead>
         <tbody id="files-tbody"><tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Chưa có file nào</td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- TAB SETTINGS -->
+  <div class="tab-page" id="tab-settings">
+    <div class="card-box">
+      <div class="section-title" style="margin-bottom:20px">⚙ Cấu Hình Hệ Thống</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <div class="section-title" style="margin-bottom:8px">🏠 Tên Phòng</div>
+          <div class="setting-desc">
+            Tên phòng chung của hệ thống. Khi client gọi <code style="color:var(--orange)">/check-key</code>,
+            server sẽ trả về tên phòng này cùng với thông tin license.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tên Phòng</label>
+            <input class="form-input" id="inp-room-name" placeholder="Phòng 101 / Studio A / ..."/>
+          </div>
+          <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveRoomName()">💾 LƯU TÊN PHÒNG</button>
+          <div class="api-preview" id="api-preview">
+            <div style="color:var(--sub);font-size:11px;margin-bottom:4px">▸ Response từ /check-key</div>
+            {<br>
+            &nbsp;&nbsp;"name": "Nguyen Van A",<br>
+            &nbsp;&nbsp;"room_name": "<span id="preview-room" style="color:var(--green)">...</span>",<br>
+            &nbsp;&nbsp;"expire_in_days": 25<br>
+            }
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="section-title" style="margin-bottom:8px">ℹ Thông Tin</div>
+          <div class="setting-desc" style="line-height:2">
+            Tên phòng được lưu trong <code style="color:var(--orange)">config.json</code>.<br>
+            Tất cả license khi check đều nhận cùng một <code style="color:var(--cyan)">room_name</code>.<br>
+            Thay đổi có hiệu lực ngay lập tức, không cần restart server.
+          </div>
+          <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--sub);margin-bottom:8px;letter-spacing:1px">TRẠNG THÁI HIỆN TẠI</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:14px">
+              Tên phòng: <span id="current-room-display" style="color:var(--cyan)">...</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -272,11 +334,40 @@ function switchTab(tab, el) {
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   if (tab === 'files') loadFiles();
+  if (tab === 'settings') loadConfig();
 }
 
 // Set default expire date
 const d = new Date(); d.setDate(d.getDate()+30);
 document.getElementById('inp-expire').value = d.toISOString().split('T')[0];
+
+// ── CONFIG / ROOM ─────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const res = await fetch('/config');
+  const cfg = await res.json();
+  const room = cfg.room_name || '';
+  document.getElementById('inp-room-name').value = room;
+  document.getElementById('preview-room').textContent = room || '(chưa đặt)';
+  document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
+  const hdr = document.getElementById('header-room');
+  if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
+  else hdr.style.display = 'none';
+}
+
+async function saveRoomName() {
+  const room = document.getElementById('inp-room-name').value.trim();
+  const res = await fetch('/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({room_name: room})
+  });
+  if (res.ok) {
+    showToast('✓ Đã lưu tên phòng: ' + (room || '(xóa)'), 'success');
+    loadConfig();
+  } else {
+    showToast('❌ Lỗi lưu config', 'error');
+  }
+}
 
 // ── LICENSE ──────────────────────────────────────────────────────────────────
 async function loadLicenses() {
@@ -304,13 +395,12 @@ function updateStats(data) {
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>';
     return;
   }
   tbody.innerHTML = data.map((l, i) => {
     const days = l.days_left;
     const expireDate = l.expires_at.split('T')[0];
-    const roomName = l.room_name || '—';
     let st, dh;
     if (days <= 0) {
       st = '<span class="status status-expired">Hết hạn</span>';
@@ -322,14 +412,10 @@ function renderLicenseTable(data) {
       st = '<span class="status status-active">Hoạt động</span>';
       dh = '<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';
     }
-    const roomHtml = roomName !== '—'
-      ? `<span class="room-badge">🏠 ${roomName}</span>`
-      : `<span style="color:var(--sub)">—</span>`;
     return `<tr>
       <td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td>
       <td style="font-weight:600">${l.name}</td>
       <td><span class="mono">${l.machine_id}</span></td>
-      <td>${roomHtml}</td>
       <td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td>
       <td>${dh}</td><td>${st}</td>
       <td><div class="actions">
@@ -343,16 +429,14 @@ function renderLicenseTable(data) {
 async function addLicense() {
   const name=document.getElementById('inp-name').value.trim();
   const mid=document.getElementById('inp-mid').value.trim();
-  const room=document.getElementById('inp-room').value.trim();
   const expire=document.getElementById('inp-expire').value;
   if(!name||!mid||!expire){showToast('Điền đầy đủ thông tin!','error');return;}
   const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name,machine_id:mid,room_name:room,expires_at:expire})});
+    body:JSON.stringify({name,machine_id:mid,expires_at:expire})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã thêm: '+name,'success');
     document.getElementById('inp-name').value='';
     document.getElementById('inp-mid').value='';
-    document.getElementById('inp-room').value='';
     loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
 }
@@ -465,13 +549,27 @@ document.getElementById('modal-extend').addEventListener('click',function(e){
 });
 
 loadLicenses();
+loadConfig();
 setInterval(loadLicenses, 30000);
 </script>
 </body>
 </html>
 """
 
-# ─── LICENSE ROUTES ─────────────────────────────────────────────────────────────
+# ─── CONFIG ROUTES ────────────────────────────────────────────────────────────
+@app.route('/config', methods=['GET'])
+def get_config():
+    return jsonify(load_config())
+
+@app.route('/config', methods=['POST'])
+def set_config():
+    data = request.json
+    cfg = load_config()
+    cfg['room_name'] = data.get('room_name', '')
+    save_config(cfg)
+    return jsonify({'success': True, 'room_name': cfg['room_name']})
+
+# ─── LICENSE ROUTES ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
     return render_template_string(HTML)
@@ -490,9 +588,10 @@ def check_key():
     days_left = (expire - now).days
     if days_left < 0:
         return jsonify({'error': 'expired'}), 403
+    cfg = load_config()
     return jsonify({
         'name': lic['name'],
-        'room_name': lic.get('room_name', ''),
+        'room_name': cfg.get('room_name', ''),
         'expire_in_days': days_left
     }), 200
 
@@ -517,7 +616,6 @@ def add_license():
         'id': len(licenses) + 1,
         'name': data['name'],
         'machine_id': data['machine_id'],
-        'room_name': data.get('room_name', ''),
         'expires_at': data['expires_at'] + 'T00:00:00',
         'created_at': datetime.now().isoformat()
     }
@@ -547,7 +645,7 @@ def extend_license(machine_id):
             return jsonify({'success': True, 'new_expire': l['expires_at']})
     return jsonify({'error': 'not_found'}), 404
 
-# ─── FILE ROUTES ─────────────────────────────────────────────────────────────────
+# ─── FILE ROUTES ──────────────────────────────────────────────────────────────
 @app.route('/files', methods=['GET'])
 def list_files():
     return jsonify(get_files_info())
