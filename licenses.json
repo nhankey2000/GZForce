@@ -7,67 +7,10 @@
     "created_at": "2026-01-01T00:00:00"
   },
   {
-    "id": 2,
-    "name": "Thành Nhân ",
-    "machine_id": "96055851D27CF6AF",
-    "expires_at": "2027-05-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-    {
-    "id": 3,
-    "name": "Máy Cty",
-    "machine_id": "B5618FC8A32DA8CA",
-    "expires_at": "2026-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-
-{
-    "id": 4,
-    "name": "Thành Nhân Máy Phụ",
-    "machine_id": "58FD6A288652B34F",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-  {
-     "id": 5,
-    "name": "Thành Nhân Lap",
-    "machine_id": "5E9547C5750784CF",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-  {
-     "id": 6,
-    "name": "Dương SOS Máy 1",
-    "machine_id": "0FCE24685C184BDA",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-   {
-     "id": 7,
-    "name": "Thu Det",
-    "machine_id": "04E1776FFFB1C361",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-  {
-     "id": 8,
-    "name": "Dương SOS Máy 2",
-    "machine_id": "04E1776FFFB1C361",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-  {
-     "id": 9,
-    "name": "Thu Máy ảo",
-    "machine_id": "F50995BA5060F253",
-    "expires_at": "2027-10-28T00:00:00",
-    "created_at": "2026-05-27T00:00:00"
-  },
-  {
   "id": 11,
-  "name": "TN Dragon Free",
-  "machine_id": "Free",
-  "created_at": "2026-05-31T00:00:00",
-  "expires_at": "2026-07-07T00:00:00"
+  "name": "TN Dragon",
+  "machine_id": "Miễn Phí",
+  "created_at": "2026-06-08T00:00:00",
+  "expires_at": "2026-07-08T00:00:00"
 }
 ]
