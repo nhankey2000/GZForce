@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from werkzeug.utils import secure_filename
 import json, os
 
@@ -9,6 +9,21 @@ CONFIG_FILE   = "config.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# ── Timezone UTC+7 ────────────────────────────────────────────────────────────
+TZ_VN = timezone(timedelta(hours=7))
+
+def now_vn():
+    return datetime.now(TZ_VN)
+
+def today():
+    return now_vn().replace(hour=0, minute=0, second=0, microsecond=0)
+
+def parse_date(iso_str):
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ_VN)
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
 def load_licenses():
     if not os.path.exists(LICENSES_FILE):
@@ -43,15 +58,9 @@ def get_files_info():
             files.append({
                 'name': fname,
                 'size': size_kb,
-                'uploaded_at': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
+                'uploaded_at': datetime.fromtimestamp(stat.st_mtime, tz=TZ_VN).strftime('%Y-%m-%d %H:%M')
             })
     return sorted(files, key=lambda x: x['uploaded_at'], reverse=True)
-
-def today():
-    return datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-def parse_date(iso_str):
-    return datetime.fromisoformat(iso_str).replace(hour=0, minute=0, second=0, microsecond=0)
 
 HTML = """
 <!DOCTYPE html>
@@ -182,7 +191,6 @@ HTML = """
 </style>
 </head>
 <body>
-
 <div class="header">
   <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
     <div class="logo">GZF<span>PANEL</span></div>
@@ -199,10 +207,7 @@ HTML = """
     <span class="badge badge-amber" id="badge-warn">⚠ 0 Expiring</span>
   </div>
 </div>
-
 <div class="main">
-
-  <!-- TAB LICENSE -->
   <div class="tab-page active" id="tab-licenses">
     <div class="stats">
       <div class="stat-card s-total"><div class="stat-label">Tổng License</div><div class="stat-num" id="stat-total">0</div></div>
@@ -233,11 +238,9 @@ HTML = """
       </table>
     </div>
   </div>
-
-  <!-- TAB FILES -->
   <div class="tab-page" id="tab-files">
     <div class="card-box">
-      <div class="section-title" style="margin-bottom:16px">📦 Upload File ZIP (Auto-Update)</div>
+      <div class="section-title" style="margin-bottom:16px">📦 Upload File ZIP</div>
       <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
         <div class="drop-zone-icon">📦</div>
         <div class="drop-zone-text">Kéo thả file <strong>.ZIP</strong> vào đây<br>hoặc <strong>click để chọn file</strong></div>
@@ -260,42 +263,37 @@ HTML = """
       </table>
     </div>
   </div>
-
-  <!-- TAB SETTINGS -->
   <div class="tab-page" id="tab-settings">
     <div class="card-box">
       <div class="section-title" style="margin-bottom:20px">⚙ Cấu Hình Hệ Thống</div>
       <div class="settings-grid">
         <div class="setting-item">
           <div class="section-title" style="margin-bottom:8px">🏠 Tên Phòng</div>
-          <div class="setting-desc">
-            Tên phòng chung của hệ thống. Khi client gọi <code style="color:var(--orange)">/check-key</code>,
-            server sẽ trả về tên phòng này cùng với thông tin license.
-          </div>
+          <div class="setting-desc">Tên phòng chung trả về khi client gọi <code style="color:var(--orange)">/check-key</code>.</div>
           <div class="form-group">
             <label class="form-label">Tên Phòng</label>
             <input class="form-input" id="inp-room-name" placeholder="Phòng 101 / Studio A / ..."/>
           </div>
           <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveRoomName()">💾 LƯU TÊN PHÒNG</button>
-          <div class="api-preview" id="api-preview">
-            <div style="color:var(--sub);font-size:11px;margin-bottom:4px">▸ Response từ /check-key</div>
+          <div class="api-preview">
+            <div style="color:var(--sub);font-size:11px;margin-bottom:4px">▸ Response /check-key (UTC+7)</div>
             {<br>
             &nbsp;&nbsp;"name": "Nguyen Van A",<br>
             &nbsp;&nbsp;"room_name": "<span id="preview-room" style="color:var(--green)">...</span>",<br>
-            &nbsp;&nbsp;"expire_in_days": 25.6<br>
+            &nbsp;&nbsp;"expire_in_days": 25.6,<br>
+            &nbsp;&nbsp;"expires_at": "2026-07-05T23:59:59"<br>
             }
           </div>
         </div>
         <div class="setting-item">
           <div class="section-title" style="margin-bottom:8px">ℹ Thông Tin</div>
           <div class="setting-desc" style="line-height:2">
-            Tên phòng được lưu trong <code style="color:var(--orange)">config.json</code>.<br>
-            Tất cả license khi check đều nhận cùng một <code style="color:var(--cyan)">room_name</code>.<br>
-            Thay đổi có hiệu lực ngay lập tức, không cần restart server.<br>
-            <code style="color:var(--green)">expire_in_days</code> trả về dạng float (vd: 28.6) để hiển thị giờ/phút chính xác.
+            Lưu trong <code style="color:var(--orange)">config.json</code>.<br>
+            Hiệu lực ngay, không cần restart.<br>
+            Múi giờ: <code style="color:var(--green)">UTC+7 (Việt Nam)</code>.
           </div>
           <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
-            <div style="font-size:11px;color:var(--sub);margin-bottom:8px;letter-spacing:1px">TRẠNG THÁI HIỆN TẠI</div>
+            <div style="font-size:11px;color:var(--sub);margin-bottom:8px;letter-spacing:1px">TRẠNG THÁI</div>
             <div style="font-family:'Share Tech Mono',monospace;font-size:14px">
               Tên phòng: <span id="current-room-display" style="color:var(--cyan)">...</span>
             </div>
@@ -304,10 +302,7 @@ HTML = """
       </div>
     </div>
   </div>
-
 </div>
-
-<!-- MODAL GIA HẠN -->
 <div class="modal-overlay" id="modal-extend">
   <div class="modal">
     <div class="modal-title">⏱ GIA HẠN LICENSE</div>
@@ -322,12 +317,9 @@ HTML = """
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
 <script>
 let currentExtendId = null;
-
 function switchTab(tab, el) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -336,10 +328,8 @@ function switchTab(tab, el) {
   if (tab === 'files') loadFiles();
   if (tab === 'settings') loadConfig();
 }
-
 const d = new Date(); d.setDate(d.getDate()+30);
 document.getElementById('inp-expire').value = d.toISOString().split('T')[0];
-
 async function loadConfig() {
   const res = await fetch('/config');
   const cfg = await res.json();
@@ -351,207 +341,95 @@ async function loadConfig() {
   if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
   else hdr.style.display = 'none';
 }
-
 async function saveRoomName() {
   const room = document.getElementById('inp-room-name').value.trim();
-  const res = await fetch('/config', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({room_name: room})
-  });
-  if (res.ok) {
-    showToast('✓ Đã lưu tên phòng: ' + (room || '(xóa)'), 'success');
-    loadConfig();
-  } else {
-    showToast('❌ Lỗi lưu config', 'error');
-  }
+  const res = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({room_name: room}) });
+  if (res.ok) { showToast('✓ Đã lưu tên phòng', 'success'); loadConfig(); }
+  else showToast('❌ Lỗi lưu config', 'error');
 }
-
 async function loadLicenses() {
   const res = await fetch('/licenses');
   const data = await res.json();
   renderLicenseTable(data);
   updateStats(data);
 }
-
 function updateStats(data) {
-  const total   = data.length;
-  const active  = data.filter(l => l.days_left > 0).length;
-  const expired = data.filter(l => l.days_left <= 0).length;
-  const warn    = data.filter(l => l.days_left > 0 && l.days_left <= 7).length;
-  document.getElementById('stat-total').textContent   = total;
-  document.getElementById('stat-active').textContent  = active;
-  document.getElementById('stat-expired').textContent = expired;
-  document.getElementById('stat-warn').textContent    = warn;
-  document.getElementById('total-count').textContent  = total + ' license';
-  document.getElementById('badge-active').textContent  = '● ' + active  + ' Active';
-  document.getElementById('badge-expired').textContent = '● ' + expired + ' Expired';
-  document.getElementById('badge-warn').textContent    = '⚠ ' + warn    + ' Expiring';
+  const total=data.length, active=data.filter(l=>l.days_left>0).length,
+    expired=data.filter(l=>l.days_left<=0).length, warn=data.filter(l=>l.days_left>0&&l.days_left<=7).length;
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-active').textContent=active;
+  document.getElementById('stat-expired').textContent=expired;
+  document.getElementById('stat-warn').textContent=warn;
+  document.getElementById('total-count').textContent=total+' license';
+  document.getElementById('badge-active').textContent='● '+active+' Active';
+  document.getElementById('badge-expired').textContent='● '+expired+' Expired';
+  document.getElementById('badge-warn').textContent='⚠ '+warn+' Expiring';
 }
-
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
-  if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>';
-    return;
-  }
-  tbody.innerHTML = data.map((l, i) => {
-    const days = l.days_left;
-    const expireDate = l.expires_at.split('T')[0];
-    let st, dh;
-    if (days <= 0) {
-      st = '<span class="status status-expired">Hết hạn</span>';
-      dh = '<span style="color:var(--red);font-family:Share Tech Mono,monospace">Hết hạn</span>';
-    } else if (days <= 7) {
-      st = '<span class="status status-warn">Sắp hết</span>';
-      dh = '<span style="color:var(--amber);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';
-    } else {
-      st = '<span class="status status-active">Hoạt động</span>';
-      dh = '<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';
-    }
-    return `<tr>
-      <td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td>
-      <td style="font-weight:600">${l.name}</td>
-      <td><span class="mono">${l.machine_id}</span></td>
-      <td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td>
-      <td>${dh}</td><td>${st}</td>
-      <td><div class="actions">
-        <button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button>
-        <button class="btn btn-red"   onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button>
-      </div></td>
-    </tr>`;
+  if (!data.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
+  tbody.innerHTML = data.map((l,i) => {
+    const days=l.days_left, expireDate=l.expires_at.split('T')[0];
+    let st,dh;
+    if(days<=0){st='<span class="status status-expired">Hết hạn</span>';dh='<span style="color:var(--red);font-family:Share Tech Mono,monospace">Hết hạn</span>';}
+    else if(days<=7){st='<span class="status status-warn">Sắp hết</span>';dh='<span style="color:var(--amber);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
+    else{st='<span class="status status-active">Hoạt động</span>';dh='<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
+    return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
   }).join('');
 }
-
 async function addLicense() {
-  const name=document.getElementById('inp-name').value.trim();
-  const mid=document.getElementById('inp-mid').value.trim();
-  const expire=document.getElementById('inp-expire').value;
+  const name=document.getElementById('inp-name').value.trim(), mid=document.getElementById('inp-mid').value.trim(), expire=document.getElementById('inp-expire').value;
   if(!name||!mid||!expire){showToast('Điền đầy đủ thông tin!','error');return;}
-  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({name,machine_id:mid,expires_at:expire})});
+  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,expires_at:expire})});
   const data=await res.json();
-  if(res.ok){showToast('✓ Đã thêm: '+name,'success');
-    document.getElementById('inp-name').value='';
-    document.getElementById('inp-mid').value='';
-    loadLicenses();}
+  if(res.ok){showToast('✓ Đã thêm: '+name,'success');document.getElementById('inp-name').value='';document.getElementById('inp-mid').value='';loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
 }
-
 async function deleteLicense(mid,name){
   if(!confirm('Xóa license của '+name+'?'))return;
   await fetch('/licenses/'+mid,{method:'DELETE'});
   showToast('✓ Đã xóa: '+name,'success');loadLicenses();
 }
-
-function openExtend(mid,daysLeft){
-  currentExtendId=mid;
-  document.getElementById('extend-info').textContent='Machine ID: '+mid+' · Còn '+daysLeft+' ngày';
-  document.getElementById('modal-extend').classList.add('active');
-}
+function openExtend(mid,daysLeft){currentExtendId=mid;document.getElementById('extend-info').textContent='Machine ID: '+mid+' · Còn '+daysLeft+' ngày';document.getElementById('modal-extend').classList.add('active');}
 function closeModal(){document.getElementById('modal-extend').classList.remove('active');currentExtendId=null;}
 async function confirmExtend(){
   const days=parseInt(document.getElementById('extend-days').value);
   if(!days||days<1){showToast('Nhập số ngày hợp lệ','error');return;}
-  const res=await fetch('/licenses/'+currentExtendId+'/extend',{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days})});
+  const res=await fetch('/licenses/'+currentExtendId+'/extend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({days})});
   if(res.ok){showToast('✓ Đã gia hạn '+days+' ngày','success');closeModal();loadLicenses();}
 }
-
 async function loadFiles() {
-  const res = await fetch('/files');
-  const data = await res.json();
-  const tbody = document.getElementById('files-tbody');
-  if (!data.length) {
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Chưa có file nào</td></tr>';
-    return;
-  }
-  const base = window.location.origin;
-  tbody.innerHTML = data.map((f,i) => `<tr>
-    <td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td>
-    <td style="font-weight:600">📦 ${f.name}</td>
-    <td style="font-family:Share Tech Mono,monospace;color:var(--sub)">${f.size} KB</td>
-    <td style="font-family:Share Tech Mono,monospace;color:var(--sub);font-size:12px">${f.uploaded_at}</td>
-    <td><span class="mono" style="font-size:11px;cursor:pointer"
-      onclick="copyUrl('${base}/files/${f.name}/download')" title="Click để copy">
-      /files/${f.name}/download ✎
-    </span></td>
-    <td><div class="actions">
-      <a href="/files/${f.name}/download" class="btn btn-cyan" style="text-decoration:none">⬇ Tải</a>
-      <button class="btn btn-red" onclick="deleteFile('${f.name}')">Xóa</button>
-    </div></td>
-  </tr>`).join('');
+  const res=await fetch('/files'), data=await res.json(), tbody=document.getElementById('files-tbody');
+  if(!data.length){tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Chưa có file nào</td></tr>';return;}
+  const base=window.location.origin;
+  tbody.innerHTML=data.map((f,i)=>`<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">📦 ${f.name}</td><td style="font-family:Share Tech Mono,monospace;color:var(--sub)">${f.size} KB</td><td style="font-family:Share Tech Mono,monospace;color:var(--sub);font-size:12px">${f.uploaded_at}</td><td><span class="mono" style="font-size:11px;cursor:pointer" onclick="copyUrl('${base}/files/${f.name}/download')" title="Click để copy">/files/${f.name}/download ✎</span></td><td><div class="actions"><a href="/files/${f.name}/download" class="btn btn-cyan" style="text-decoration:none">⬇ Tải</a><button class="btn btn-red" onclick="deleteFile('${f.name}')">Xóa</button></div></td></tr>`).join('');
 }
-
 async function uploadFile(file) {
-  if(!file) return;
+  if(!file)return;
   if(!file.name.endsWith('.zip')){showToast('Chỉ chấp nhận file .zip','error');return;}
-  const progress=document.getElementById('upload-progress');
-  const fill=document.getElementById('progress-fill');
-  const status=document.getElementById('upload-status');
-  const urlBox=document.getElementById('file-url-box');
-  progress.style.display='block'; urlBox.style.display='none';
-  fill.style.width='0%'; status.textContent='Đang upload '+file.name+'...';
-  const formData=new FormData(); formData.append('file',file);
+  const progress=document.getElementById('upload-progress'),fill=document.getElementById('progress-fill'),status=document.getElementById('upload-status'),urlBox=document.getElementById('file-url-box');
+  progress.style.display='block';urlBox.style.display='none';fill.style.width='0%';status.textContent='Đang upload '+file.name+'...';
+  const formData=new FormData();formData.append('file',file);
   const xhr=new XMLHttpRequest();
-  xhr.upload.onprogress=e=>{
-    if(e.lengthComputable){
-      const pct=Math.round(e.loaded/e.total*100);
-      fill.style.width=pct+'%'; status.textContent='Đang upload... '+pct+'%';
-    }
-  };
-  xhr.onload=()=>{
-    if(xhr.status===200){
-      const res=JSON.parse(xhr.responseText);
-      status.textContent='✓ Upload thành công!'; fill.style.width='100%';
-      const fullUrl=window.location.origin+res.url;
-      urlBox.style.display='block'; urlBox.textContent='📋 Click để copy: '+fullUrl;
-      urlBox._url=fullUrl;
-      showToast('✓ Upload thành công: '+file.name,'success'); loadFiles();
-    } else { status.textContent='❌ Upload thất bại'; showToast('❌ Upload thất bại','error'); }
-  };
-  xhr.open('POST','/files/upload'); xhr.send(formData);
+  xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);fill.style.width=pct+'%';status.textContent='Đang upload... '+pct+'%';}};
+  xhr.onload=()=>{if(xhr.status===200){const res=JSON.parse(xhr.responseText);status.textContent='✓ Upload thành công!';fill.style.width='100%';const fullUrl=window.location.origin+res.url;urlBox.style.display='block';urlBox.textContent='📋 Click để copy: '+fullUrl;urlBox._url=fullUrl;showToast('✓ Upload thành công: '+file.name,'success');loadFiles();}else{status.textContent='❌ Upload thất bại';showToast('❌ Upload thất bại','error');}};
+  xhr.open('POST','/files/upload');xhr.send(formData);
 }
-
-async function deleteFile(name){
-  if(!confirm('Xóa file '+name+'?'))return;
-  const res=await fetch('/files/'+name,{method:'DELETE'});
-  if(res.ok){showToast('✓ Đã xóa: '+name,'success');loadFiles();}
-}
-
+async function deleteFile(name){if(!confirm('Xóa file '+name+'?'))return;const res=await fetch('/files/'+name,{method:'DELETE'});if(res.ok){showToast('✓ Đã xóa: '+name,'success');loadFiles();}}
 function copyUrl(url){navigator.clipboard.writeText(url).then(()=>showToast('✓ Đã copy URL','success'));}
-function copyUrlBox(){
-  const box=document.getElementById('file-url-box');
-  if(box._url) navigator.clipboard.writeText(box._url).then(()=>showToast('✓ Đã copy URL','success'));
-}
-
+function copyUrlBox(){const box=document.getElementById('file-url-box');if(box._url)navigator.clipboard.writeText(box._url).then(()=>showToast('✓ Đã copy URL','success'));}
 const dz=document.getElementById('drop-zone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-dz.addEventListener('drop',e=>{
-  e.preventDefault();dz.classList.remove('drag-over');
-  const file=e.dataTransfer.files[0]; if(file) uploadFile(file);
-});
-
-function showToast(msg,type='success'){
-  const t=document.getElementById('toast');
-  t.textContent=msg; t.className='toast '+type+' show';
-  setTimeout(()=>t.className='toast',3000);
-}
-
-document.getElementById('modal-extend').addEventListener('click',function(e){
-  if(e.target===this) closeModal();
-});
-
-loadLicenses();
-loadConfig();
-setInterval(loadLicenses, 30000);
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const file=e.dataTransfer.files[0];if(file)uploadFile(file);});
+function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';setTimeout(()=>t.className='toast',3000);}
+document.getElementById('modal-extend').addEventListener('click',function(e){if(e.target===this)closeModal();});
+loadLicenses();loadConfig();setInterval(loadLicenses,30000);
 </script>
 </body>
 </html>
 """
 
-# ─── CONFIG ROUTES ────────────────────────────────────────────────────────────
 @app.route('/config', methods=['GET'])
 def get_config():
     return jsonify(load_config())
@@ -564,7 +442,6 @@ def set_config():
     save_config(cfg)
     return jsonify({'success': True, 'room_name': cfg['room_name']})
 
-# ─── LICENSE ROUTES ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
     return render_template_string(HTML)
@@ -574,28 +451,24 @@ def check_key():
     machine_id = request.args.get('machine_id') or request.args.get('id')
     if not machine_id:
         return jsonify({'error': 'missing_machine_id'}), 400
-
     licenses = load_licenses()
     lic = next((l for l in licenses if l['machine_id'] == machine_id), None)
     if not lic:
         return jsonify({'error': 'not_found'}), 404
-
-    # Dùng datetime đầy đủ (không reset giờ) để tính giờ/phút chính xác
-    now    = datetime.now()
+    now    = now_vn()
     expire = datetime.fromisoformat(lic['expires_at'])
-    diff   = expire - now
-
+    if expire.tzinfo is None:
+        expire = expire.replace(tzinfo=TZ_VN)
+    diff = expire - now
     if diff.total_seconds() < 0:
         return jsonify({'error': 'expired'}), 403
-
-    # Float: ví dụ 28.6 → client hiển thị "28 ngày 14 giờ 24 phút"
     expire_in_days = diff.total_seconds() / 86400
-
     cfg = load_config()
     return jsonify({
         'name':           lic['name'],
         'room_name':      cfg.get('room_name', ''),
-        'expire_in_days': expire_in_days
+        'expire_in_days': expire_in_days,
+        'expires_at':     lic['expires_at']
     }), 200
 
 @app.route('/licenses', methods=['GET'])
@@ -619,8 +492,8 @@ def add_license():
         'id':         len(licenses) + 1,
         'name':       data['name'],
         'machine_id': data['machine_id'],
-        'expires_at': data['expires_at'] + 'T23:59:59',  # hết hạn cuối ngày
-        'created_at': datetime.now().isoformat()
+        'expires_at': data['expires_at'] + 'T23:59:59',
+        'created_at': now_vn().isoformat()
     }
     licenses.append(new_lic)
     save_licenses(licenses)
@@ -641,14 +514,15 @@ def extend_license(machine_id):
     for l in licenses:
         if l['machine_id'] == machine_id:
             expire = datetime.fromisoformat(l['expires_at'])
-            now    = datetime.now()
-            base   = expire if expire > now else now
+            if expire.tzinfo is None:
+                expire = expire.replace(tzinfo=TZ_VN)
+            now  = now_vn()
+            base = expire if expire > now else now
             l['expires_at'] = (base + timedelta(days=days)).strftime('%Y-%m-%dT23:59:59')
             save_licenses(licenses)
             return jsonify({'success': True, 'new_expire': l['expires_at']})
     return jsonify({'error': 'not_found'}), 404
 
-# ─── FILE ROUTES ──────────────────────────────────────────────────────────────
 @app.route('/files', methods=['GET'])
 def list_files():
     return jsonify(get_files_info())
