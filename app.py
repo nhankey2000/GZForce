@@ -168,7 +168,6 @@ HTML = """
   .toast.show{transform:translateY(0);opacity:1;}
   .toast.success{border-color:var(--green);color:var(--green);}
   .toast.error{border-color:var(--red);color:var(--red);}
-  /* Settings */
   .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
   .setting-item{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:20px;}
   .setting-desc{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6;}
@@ -283,7 +282,7 @@ HTML = """
             {<br>
             &nbsp;&nbsp;"name": "Nguyen Van A",<br>
             &nbsp;&nbsp;"room_name": "<span id="preview-room" style="color:var(--green)">...</span>",<br>
-            &nbsp;&nbsp;"expire_in_days": 25<br>
+            &nbsp;&nbsp;"expire_in_days": 25.6<br>
             }
           </div>
         </div>
@@ -292,7 +291,8 @@ HTML = """
           <div class="setting-desc" style="line-height:2">
             Tên phòng được lưu trong <code style="color:var(--orange)">config.json</code>.<br>
             Tất cả license khi check đều nhận cùng một <code style="color:var(--cyan)">room_name</code>.<br>
-            Thay đổi có hiệu lực ngay lập tức, không cần restart server.
+            Thay đổi có hiệu lực ngay lập tức, không cần restart server.<br>
+            <code style="color:var(--green)">expire_in_days</code> trả về dạng float (vd: 28.6) để hiển thị giờ/phút chính xác.
           </div>
           <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
             <div style="font-size:11px;color:var(--sub);margin-bottom:8px;letter-spacing:1px">TRẠNG THÁI HIỆN TẠI</div>
@@ -337,11 +337,9 @@ function switchTab(tab, el) {
   if (tab === 'settings') loadConfig();
 }
 
-// Set default expire date
 const d = new Date(); d.setDate(d.getDate()+30);
 document.getElementById('inp-expire').value = d.toISOString().split('T')[0];
 
-// ── CONFIG / ROOM ─────────────────────────────────────────────────────────────
 async function loadConfig() {
   const res = await fetch('/config');
   const cfg = await res.json();
@@ -369,7 +367,6 @@ async function saveRoomName() {
   }
 }
 
-// ── LICENSE ──────────────────────────────────────────────────────────────────
 async function loadLicenses() {
   const res = await fetch('/licenses');
   const data = await res.json();
@@ -461,7 +458,6 @@ async function confirmExtend(){
   if(res.ok){showToast('✓ Đã gia hạn '+days+' ngày','success');closeModal();loadLicenses();}
 }
 
-// ── FILES ────────────────────────────────────────────────────────────────────
 async function loadFiles() {
   const res = await fetch('/files');
   const data = await res.json();
@@ -529,7 +525,6 @@ function copyUrlBox(){
   if(box._url) navigator.clipboard.writeText(box._url).then(()=>showToast('✓ Đã copy URL','success'));
 }
 
-// Drag & Drop
 const dz=document.getElementById('drop-zone');
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
@@ -579,20 +574,28 @@ def check_key():
     machine_id = request.args.get('machine_id') or request.args.get('id')
     if not machine_id:
         return jsonify({'error': 'missing_machine_id'}), 400
+
     licenses = load_licenses()
     lic = next((l for l in licenses if l['machine_id'] == machine_id), None)
     if not lic:
         return jsonify({'error': 'not_found'}), 404
-    now    = today()
-    expire = parse_date(lic['expires_at'])
-    days_left = (expire - now).days
-    if days_left < 0:
+
+    # Dùng datetime đầy đủ (không reset giờ) để tính giờ/phút chính xác
+    now    = datetime.now()
+    expire = datetime.fromisoformat(lic['expires_at'])
+    diff   = expire - now
+
+    if diff.total_seconds() < 0:
         return jsonify({'error': 'expired'}), 403
+
+    # Float: ví dụ 28.6 → client hiển thị "28 ngày 14 giờ 24 phút"
+    expire_in_days = diff.total_seconds() / 86400
+
     cfg = load_config()
     return jsonify({
-        'name': lic['name'],
-        'room_name': cfg.get('room_name', ''),
-        'expire_in_days': days_left
+        'name':           lic['name'],
+        'room_name':      cfg.get('room_name', ''),
+        'expire_in_days': expire_in_days
     }), 200
 
 @app.route('/licenses', methods=['GET'])
@@ -613,10 +616,10 @@ def add_license():
     if any(l['machine_id'] == data['machine_id'] for l in licenses):
         return jsonify({'error': 'machine_id đã tồn tại'}), 400
     new_lic = {
-        'id': len(licenses) + 1,
-        'name': data['name'],
+        'id':         len(licenses) + 1,
+        'name':       data['name'],
         'machine_id': data['machine_id'],
-        'expires_at': data['expires_at'] + 'T00:00:00',
+        'expires_at': data['expires_at'] + 'T23:59:59',  # hết hạn cuối ngày
         'created_at': datetime.now().isoformat()
     }
     licenses.append(new_lic)
@@ -637,10 +640,10 @@ def extend_license(machine_id):
     licenses = load_licenses()
     for l in licenses:
         if l['machine_id'] == machine_id:
-            expire = parse_date(l['expires_at'])
-            now    = today()
+            expire = datetime.fromisoformat(l['expires_at'])
+            now    = datetime.now()
             base   = expire if expire > now else now
-            l['expires_at'] = (base + timedelta(days=days)).strftime('%Y-%m-%dT%H:%M:%S')
+            l['expires_at'] = (base + timedelta(days=days)).strftime('%Y-%m-%dT23:59:59')
             save_licenses(licenses)
             return jsonify({'success': True, 'new_expire': l['expires_at']})
     return jsonify({'error': 'not_found'}), 404
