@@ -6,8 +6,10 @@ import json, os
 app = Flask(__name__)
 LICENSES_FILE = "licenses.json"
 CONFIG_FILE   = "config.json"
+ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
+ONLINE_TIMEOUT_SECONDS = 180
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ── Timezone UTC+7 ────────────────────────────────────────────────────────────
@@ -44,6 +46,48 @@ def load_config():
 def save_config(cfg):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def load_online():
+    if not os.path.exists(ONLINE_FILE):
+        return {}
+    try:
+        with open(ONLINE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_online(data):
+    with open(ONLINE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_online_info():
+    now = now_vn()
+    raw = load_online()
+    online = {}
+    for mid, info in raw.items():
+        try:
+            last_seen = datetime.fromisoformat(info.get('last_seen', ''))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=TZ_VN)
+            if (now - last_seen).total_seconds() <= ONLINE_TIMEOUT_SECONDS:
+                online[mid] = info
+        except Exception:
+            pass
+    if len(online) != len(raw):
+        save_online(online)
+    return {
+        'count': len(online),
+        'timeout_seconds': ONLINE_TIMEOUT_SECONDS,
+        'users': [
+            {
+                'machine_id': mid,
+                'name': info.get('name', ''),
+                'last_seen': info.get('last_seen', '')
+            }
+            for mid, info in sorted(online.items(), key=lambda item: item[1].get('last_seen', ''), reverse=True)
+        ]
+    }
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -202,6 +246,7 @@ HTML = """
     </div>
   </div>
   <div class="header-right">
+    <span class="badge badge-green" id="badge-online">Online: 0</span>
     <span class="badge badge-green" id="badge-active">● 0 Active</span>
     <span class="badge badge-red"   id="badge-expired">● 0 Expired</span>
     <span class="badge badge-amber" id="badge-warn">⚠ 0 Expiring</span>
@@ -213,7 +258,7 @@ HTML = """
       <div class="stat-card s-total"><div class="stat-label">Tổng License</div><div class="stat-num" id="stat-total">0</div></div>
       <div class="stat-card s-active"><div class="stat-label">Hoạt Động</div><div class="stat-num" id="stat-active">0</div></div>
       <div class="stat-card s-expired"><div class="stat-label">Hết Hạn</div><div class="stat-num" id="stat-expired">0</div></div>
-      <div class="stat-card s-warn"><div class="stat-label">Sắp Hết (7 ngày)</div><div class="stat-num" id="stat-warn">0</div></div>
+      <div class="stat-card s-warn"><div class="stat-label">Online</div><div class="stat-num" id="stat-online">0</div></div>
     </div>
     <div class="card-box">
       <div class="section-title" style="margin-bottom:16px">Thêm License Mới</div>
@@ -352,6 +397,15 @@ async function loadLicenses() {
   const data = await res.json();
   renderLicenseTable(data);
   updateStats(data);
+  loadOnline();
+}
+async function loadOnline() {
+  try {
+    const res = await fetch('/online');
+    const data = await res.json();
+    document.getElementById('stat-online').textContent = data.count || 0;
+    document.getElementById('badge-online').textContent = 'Online: ' + (data.count || 0);
+  } catch(e) {}
 }
 function updateStats(data) {
   const total=data.length, active=data.filter(l=>l.days_left>0).length,
@@ -359,7 +413,6 @@ function updateStats(data) {
   document.getElementById('stat-total').textContent=total;
   document.getElementById('stat-active').textContent=active;
   document.getElementById('stat-expired').textContent=expired;
-  document.getElementById('stat-warn').textContent=warn;
   document.getElementById('total-count').textContent=total+' license';
   document.getElementById('badge-active').textContent='● '+active+' Active';
   document.getElementById('badge-expired').textContent='● '+expired+' Expired';
@@ -464,12 +517,40 @@ def check_key():
         return jsonify({'error': 'expired'}), 403
     expire_in_days = diff.total_seconds() / 86400
     cfg = load_config()
+    online = load_online()
+    online[machine_id] = {
+        'name': lic.get('name', ''),
+        'last_seen': now.isoformat()
+    }
+    save_online(online)
     return jsonify({
         'name':           lic['name'],
         'room_name':      cfg.get('room_name', ''),
         'expire_in_days': expire_in_days,
         'expires_at':     lic['expires_at']
     }), 200
+
+@app.route('/heartbeat', methods=['POST'])
+def heartbeat():
+    data = request.json or {}
+    machine_id = data.get('machine_id') or data.get('id')
+    if not machine_id:
+        return jsonify({'error': 'missing_machine_id'}), 400
+    licenses = load_licenses()
+    lic = next((l for l in licenses if l['machine_id'] == machine_id), None)
+    if not lic:
+        return jsonify({'error': 'not_found'}), 404
+    online = load_online()
+    online[machine_id] = {
+        'name': lic.get('name', data.get('name', '')),
+        'last_seen': now_vn().isoformat()
+    }
+    save_online(online)
+    return jsonify({'success': True, **get_online_info()}), 200
+
+@app.route('/online', methods=['GET'])
+def online_users():
+    return jsonify(get_online_info())
 
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
