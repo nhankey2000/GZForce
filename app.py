@@ -61,17 +61,20 @@ def save_online(data):
     with open(ONLINE_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
+def get_online_key(machine_id, device_id=None):
+    return (device_id or machine_id or '').strip()
+
 def get_online_info():
     now = now_vn()
     raw = load_online()
     online = {}
-    for mid, info in raw.items():
+    for online_id, info in raw.items():
         try:
             last_seen = datetime.fromisoformat(info.get('last_seen', ''))
             if last_seen.tzinfo is None:
                 last_seen = last_seen.replace(tzinfo=TZ_VN)
             if (now - last_seen).total_seconds() <= ONLINE_TIMEOUT_SECONDS:
-                online[mid] = info
+                online[online_id] = info
         except Exception:
             pass
     if len(online) != len(raw):
@@ -81,11 +84,14 @@ def get_online_info():
         'timeout_seconds': ONLINE_TIMEOUT_SECONDS,
         'users': [
             {
-                'machine_id': mid,
+                'online_id': online_id,
+                'machine_id': info.get('machine_id', online_id),
+                'device_id': info.get('device_id', online_id),
+                'device_name': info.get('device_name', ''),
                 'name': info.get('name', ''),
                 'last_seen': info.get('last_seen', '')
             }
-            for mid, info in sorted(online.items(), key=lambda item: item[1].get('last_seen', ''), reverse=True)
+            for online_id, info in sorted(online.items(), key=lambda item: item[1].get('last_seen', ''), reverse=True)
         ]
     }
 
@@ -502,6 +508,8 @@ def home():
 @app.route('/check-key', methods=['GET'])
 def check_key():
     machine_id = request.args.get('machine_id') or request.args.get('id')
+    device_id = request.args.get('device_id')
+    device_name = request.args.get('device_name', '')
     if not machine_id:
         return jsonify({'error': 'missing_machine_id'}), 400
     licenses = load_licenses()
@@ -518,7 +526,11 @@ def check_key():
     expire_in_days = diff.total_seconds() / 86400
     cfg = load_config()
     online = load_online()
-    online[machine_id] = {
+    online_id = get_online_key(machine_id, device_id)
+    online[online_id] = {
+        'machine_id': machine_id,
+        'device_id': device_id or online_id,
+        'device_name': device_name,
         'name': lic.get('name', ''),
         'last_seen': now.isoformat()
     }
@@ -534,6 +546,8 @@ def check_key():
 def heartbeat():
     data = request.json or {}
     machine_id = data.get('machine_id') or data.get('id')
+    device_id = data.get('device_id')
+    device_name = data.get('device_name', '')
     if not machine_id:
         return jsonify({'error': 'missing_machine_id'}), 400
     licenses = load_licenses()
@@ -541,7 +555,11 @@ def heartbeat():
     if not lic:
         return jsonify({'error': 'not_found'}), 404
     online = load_online()
-    online[machine_id] = {
+    online_id = get_online_key(machine_id, device_id)
+    online[online_id] = {
+        'machine_id': machine_id,
+        'device_id': device_id or online_id,
+        'device_name': device_name,
         'name': lic.get('name', data.get('name', '')),
         'last_seen': now_vn().isoformat()
     }
