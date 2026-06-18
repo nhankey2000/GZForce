@@ -26,5 +26,12 @@
   "machine_id": "TNDRAGON-9B5799D26195D6D7",
   "created_at": "2026-06-08T00:00:00",
   "expires_at": "2027-06-22T00:00:00"
+},
+  {
+  "id": 4,
+  "name": "Máy CTY",
+  "machine_id": "TNDRAGON-35D676C406FD3C98",
+  "created_at": "2026-06-08T00:00:00",
+  "expires_at": "2027-06-22T00:00:00"
 }
 ]
