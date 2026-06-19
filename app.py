@@ -112,6 +112,26 @@ def get_files_info():
             })
     return sorted(files, key=lambda x: x['uploaded_at'], reverse=True)
 
+def normalize_permissions(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    combos = raw.get('allowed_combos', [])
+    clean = []
+    seen = set()
+    if isinstance(combos, list):
+        for item in combos:
+            mode = option = ''
+            if isinstance(item, dict):
+                mode = str(item.get('mode', '')).strip()
+                option = str(item.get('option', '')).strip()
+            elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                mode = str(item[0]).strip()
+                option = str(item[1]).strip()
+            key = (mode, option)
+            if mode and option and key not in seen:
+                clean.append({'mode': mode, 'option': option})
+                seen.add(key)
+    return {'allowed_combos': clean}
+
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -174,6 +194,12 @@ HTML = """
     padding:10px 14px;color:var(--text);font-family:'Share Tech Mono',monospace;
     font-size:13px;outline:none;transition:border-color .2s;width:100%;}
   .form-input:focus{border-color:var(--orange);}
+  .perm-box{margin-top:14px;border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--card2);}
+  .perm-note{font-size:12px;color:var(--sub);margin-bottom:10px;}
+  .perm-row{display:grid;grid-template-columns:1fr 1fr 1.6fr auto auto;gap:12px;align-items:end;}
+  .perm-text{min-height:64px;resize:vertical;line-height:1.45;}
+  .perm-badges{display:flex;flex-wrap:wrap;gap:4px;max-width:300px;}
+  .perm-badge{font-size:11px;padding:2px 7px;border:1px solid var(--cyan);color:var(--cyan);border-radius:12px;background:rgba(0,229,255,.06);}
   .btn{padding:10px 20px;border-radius:6px;border:none;cursor:pointer;
     font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
     letter-spacing:1px;transition:all .2s;white-space:nowrap;}
@@ -277,6 +303,16 @@ HTML = """
           <input class="form-input" id="inp-expire" type="date"/></div>
         <button class="btn btn-orange" onclick="addLicense()">+ THÊM</button>
       </div>
+      <div class="perm-box">
+        <div class="perm-note">Phân quyền thử cho Gọi Boss / Xả Thẻ theo đúng cặp chế độ + tùy chọn. Không thêm quyền nào = không khóa quyền.</div>
+        <div class="perm-row">
+          <div class="form-group"><label class="form-label">Chế Độ</label><select class="form-input" id="perm-mode"><option>Tất cả</option><option>Gọi Boss</option><option>Bắn Boss</option><option>Treo Zombie</option><option>Treo GP</option><option>Farm Thẻ</option><option>Xả Thẻ</option><option>Treo 20 Phút</option><option>Treo 60 Phút</option><option>Chạy Theo</option></select></div>
+          <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="perm-option"><option>Tất cả</option><option>Không chọn</option><option>RZ2 Thần Chết</option><option>RZ2 Lùm Tre Mid</option><option>RZ2 Nước</option><option>RZ4 Glacial Beast</option><option>RZ4 Gấu</option><option>RZ3 Gấu</option></select></div>
+          <div class="form-group"><label class="form-label">Cặp Đã Chọn</label><textarea class="form-input perm-text" id="permission-selected" readonly placeholder="Chưa thêm quyền nào"></textarea></div>
+          <button type="button" class="btn btn-cyan" style="height:39px" id="btn-add-permission" onclick="addPermissionCombo()">+ QUYỀN</button>
+          <button type="button" class="btn btn-red" style="height:39px" id="btn-clear-permission" onclick="clearAllowedCombos()">XÓA</button>
+        </div>
+      </div>
     </div>
     <div class="section-header">
       <div class="section-title">Danh Sách License</div>
@@ -284,8 +320,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
-        <tbody id="license-tbody"><tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
+        <tbody id="license-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -368,9 +404,120 @@ HTML = """
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="modal-permissions">
+  <div class="modal" style="width:720px">
+    <div class="modal-title">🔐 SỬA QUYỀN</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:12px" id="perm-edit-info"></div>
+    <div class="perm-row" style="grid-template-columns:1fr 1fr 1.6fr auto auto">
+      <div class="form-group"><label class="form-label">Chế Độ</label><select class="form-input" id="edit-perm-mode"></select></div>
+      <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="edit-perm-option"></select></div>
+      <div class="form-group"><label class="form-label">Cặp Đã Chọn</label><textarea class="form-input perm-text" id="edit-permission-selected" readonly placeholder="Chưa thêm quyền nào"></textarea></div>
+      <button type="button" class="btn btn-cyan" style="height:39px" onclick="addEditPermissionCombo()">+ QUYỀN</button>
+      <button type="button" class="btn btn-red" style="height:39px" onclick="clearEditPermissionCombos()">XÓA</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePermissionsModal()">Hủy</button>
+      <button class="btn-confirm" onclick="savePermissions()">Lưu Quyền</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 let currentExtendId = null;
+let currentPermissionId = null;
+let editPermissionCombos = [];
+const PERMISSION_MODES = ['Tất cả','Gọi Boss','Bắn Boss','Treo Zombie','Treo GP','Farm Thẻ','Xả Thẻ','Treo 20 Phút','Treo 60 Phút','Chạy Theo'];
+const PERMISSION_OPTIONS = ['Tất cả','Không chọn','RZ2 Thần Chết','RZ2 Lùm Tre Mid','RZ2 Nước','RZ4 Glacial Beast','RZ4 Gấu','RZ3 Gấu'];
+let selectedPermissionCombos = [];
+function renderPermissionPicker(){
+  const modeSel=document.getElementById('perm-mode');
+  const optionSel=document.getElementById('perm-option');
+  if(!modeSel||!optionSel)return;
+  fillPermissionSelects('perm-mode','perm-option');
+  renderSelectedPermissionCombos();
+}
+function comboExists(mode, option){return selectedPermissionCombos.some(c=>c.mode===mode&&c.option===option);}
+function addPermissionCombo(){
+  const mode=document.getElementById('perm-mode').value;
+  const option=document.getElementById('perm-option').value;
+  if(comboExists(mode, option)){
+    renderSelectedPermissionCombos();
+    if(typeof showToast === 'function') showToast('Cặp quyền đã có','error');
+    return;
+  }
+  selectedPermissionCombos.push({mode, option});
+  renderSelectedPermissionCombos();
+  if(typeof showToast === 'function') showToast('Đã thêm quyền: '+mode+' + '+option,'success');
+}
+function removePermissionCombo(index){selectedPermissionCombos.splice(index,1);renderSelectedPermissionCombos();}
+function renderSelectedPermissionCombos(){
+  const box=document.getElementById('permission-selected');
+  if(!box)return;
+  const text = selectedPermissionCombos.map(c=>c.mode === 'Tất cả' && c.option === 'Tất cả' ? 'Tất cả' : (c.option === 'Không chọn' ? c.mode : `${c.mode} + ${c.option}`)).join('\\n');
+  box.value = text;
+  box.textContent = text;
+}
+function collectAllowedCombos(){return selectedPermissionCombos.slice();}
+function clearAllowedCombos(){selectedPermissionCombos=[];renderSelectedPermissionCombos();}
+function fillPermissionSelects(modeId, optionId){
+  const modeSel=document.getElementById(modeId);
+  const optionSel=document.getElementById(optionId);
+  if(!modeSel||!optionSel)return;
+  modeSel.innerHTML=PERMISSION_MODES.map(v=>`<option value="${v}">${v}</option>`).join('');
+  optionSel.innerHTML=PERMISSION_OPTIONS.map(v=>`<option value="${v}">${v}</option>`).join('');
+}
+function renderEditPermissionCombos(){
+  const box=document.getElementById('edit-permission-selected');
+  if(!box)return;
+  const text = editPermissionCombos.map(c=>c.mode === 'Tất cả' && c.option === 'Tất cả' ? 'Tất cả' : (c.option === 'Không chọn' ? c.mode : `${c.mode} + ${c.option}`)).join('\\n');
+  box.value = text;
+  box.textContent = text;
+}
+function editComboExists(mode, option){return editPermissionCombos.some(c=>c.mode===mode&&c.option===option);}
+function addEditPermissionCombo(){
+  const mode=document.getElementById('edit-perm-mode').value;
+  const option=document.getElementById('edit-perm-option').value;
+  if(editComboExists(mode, option)){showToast('Cặp quyền đã có','error');return;}
+  editPermissionCombos.push({mode, option});
+  renderEditPermissionCombos();
+}
+function clearEditPermissionCombos(){editPermissionCombos=[];renderEditPermissionCombos();}
+function openPermissions(mid, name, encodedPerms){
+  currentPermissionId = mid;
+  let perms = {allowed_combos: []};
+  try { perms = JSON.parse(decodeURIComponent(encodedPerms || '')); } catch(e) {}
+  editPermissionCombos = Array.isArray(perms.allowed_combos) ? perms.allowed_combos.slice() : [];
+  fillPermissionSelects('edit-perm-mode','edit-perm-option');
+  renderEditPermissionCombos();
+  document.getElementById('perm-edit-info').textContent = 'Machine ID: '+mid+' · '+name;
+  document.getElementById('modal-permissions').classList.add('active');
+}
+function closePermissionsModal(){document.getElementById('modal-permissions').classList.remove('active');currentPermissionId=null;}
+async function savePermissions(){
+  if(!currentPermissionId)return;
+  const res=await fetch('/licenses/'+currentPermissionId+'/permissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({permissions:{allowed_combos:editPermissionCombos}})});
+  const data=await res.json();
+  if(res.ok){showToast('✓ Đã lưu quyền','success');closePermissionsModal();loadLicenses();}
+  else showToast('❌ '+(data.error||'Lỗi lưu quyền'),'error');
+}
+function initPermissionButtons(){
+  const addBtn=document.getElementById('btn-add-permission');
+  const clearBtn=document.getElementById('btn-clear-permission');
+  if(addBtn)addBtn.onclick = addPermissionCombo;
+  if(clearBtn)clearBtn.onclick = clearAllowedCombos;
+}
+function initPage(){
+  renderPermissionPicker();
+  initPermissionButtons();
+  loadLicenses();
+  loadConfig();
+  setInterval(loadLicenses,30000);
+}
+function formatPermissions(l){
+  const combos = l.permissions && Array.isArray(l.permissions.allowed_combos) ? l.permissions.allowed_combos : [];
+  if(!combos.length)return '<span style="color:var(--sub);font-size:12px">Không khóa</span>';
+  return '<div class="perm-badges">'+combos.map(c=>`<span class="perm-badge">${c.mode === 'Tất cả' && c.option === 'Tất cả' ? 'Tất cả' : (c.option === 'Không chọn' ? c.mode : c.mode+' · '+c.option)}</span>`).join('')+'</div>';
+}
 function switchTab(tab, el) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -426,22 +573,25 @@ function updateStats(data) {
 }
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
-  if (!data.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
   tbody.innerHTML = data.map((l,i) => {
     const days=l.days_left, expireDate=l.expires_at.split('T')[0];
     let st,dh;
     if(days<=0){st='<span class="status status-expired">Hết hạn</span>';dh='<span style="color:var(--red);font-family:Share Tech Mono,monospace">Hết hạn</span>';}
     else if(days<=7){st='<span class="status status-warn">Sắp hết</span>';dh='<span style="color:var(--amber);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
     else{st='<span class="status status-active">Hoạt động</span>';dh='<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
-    return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
+    const perms=formatPermissions(l);
+    const permData=encodeURIComponent(JSON.stringify(l.permissions||{allowed_combos:[]}));
+    return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
   }).join('');
 }
 async function addLicense() {
   const name=document.getElementById('inp-name').value.trim(), mid=document.getElementById('inp-mid').value.trim(), expire=document.getElementById('inp-expire').value;
   if(!name||!mid||!expire){showToast('Điền đầy đủ thông tin!','error');return;}
-  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,expires_at:expire})});
+  const allowed_combos=collectAllowedCombos();
+  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,expires_at:expire,permissions:{allowed_combos}})});
   const data=await res.json();
-  if(res.ok){showToast('✓ Đã thêm: '+name,'success');document.getElementById('inp-name').value='';document.getElementById('inp-mid').value='';loadLicenses();}
+  if(res.ok){showToast('✓ Đã thêm: '+name,'success');document.getElementById('inp-name').value='';document.getElementById('inp-mid').value='';clearAllowedCombos();loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
 }
 async function deleteLicense(mid,name){
@@ -483,7 +633,9 @@ dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const file=e.dataTransfer.files[0];if(file)uploadFile(file);});
 function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';setTimeout(()=>t.className='toast',3000);}
 document.getElementById('modal-extend').addEventListener('click',function(e){if(e.target===this)closeModal();});
-loadLicenses();loadConfig();setInterval(loadLicenses,30000);
+document.getElementById('modal-permissions').addEventListener('click',function(e){if(e.target===this)closePermissionsModal();});
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPage);
+else initPage();
 </script>
 </body>
 </html>
@@ -539,7 +691,8 @@ def check_key():
         'name':           lic['name'],
         'room_name':      cfg.get('room_name', ''),
         'expire_in_days': expire_in_days,
-        'expires_at':     lic['expires_at']
+        'expires_at':     lic['expires_at'],
+        'permissions':    normalize_permissions(lic.get('permissions', {}))
     }), 200
 
 @app.route('/heartbeat', methods=['POST'])
@@ -592,7 +745,8 @@ def add_license():
         'name':       data['name'],
         'machine_id': data['machine_id'],
         'expires_at': data['expires_at'] + 'T23:59:59',
-        'created_at': now_vn().isoformat()
+        'created_at': now_vn().isoformat(),
+        'permissions': normalize_permissions(data.get('permissions', {}))
     }
     licenses.append(new_lic)
     save_licenses(licenses)
@@ -604,6 +758,17 @@ def delete_license(machine_id):
     licenses = [l for l in licenses if l['machine_id'] != machine_id]
     save_licenses(licenses)
     return jsonify({'success': True})
+
+@app.route('/licenses/<machine_id>/permissions', methods=['POST'])
+def update_license_permissions(machine_id):
+    data = request.json or {}
+    licenses = load_licenses()
+    for l in licenses:
+        if l['machine_id'] == machine_id:
+            l['permissions'] = normalize_permissions(data.get('permissions', {}))
+            save_licenses(licenses)
+            return jsonify({'success': True, 'permissions': l['permissions']})
+    return jsonify({'error': 'not_found'}), 404
 
 @app.route('/licenses/<machine_id>/extend', methods=['POST'])
 def extend_license(machine_id):
