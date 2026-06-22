@@ -30,16 +30,28 @@
   }
 },
   {
-    "id": 11,
-    "name": "TN Dragon",
-    "machine_id": "Miễn Phí",
-    "created_at": "2026-06-08T00:00:00",
-    "expires_at": "2026-06-26T00:00:00",
+    "id": 10,
+    "name": "TNDragon",
+    "machine_id": "Free",
+    "expires_at": "2026-07-22T23:59:59",
+    "created_at": "2026-06-22T19:20:06.754655+07:00",
     "permissions": {
       "allowed_combos": [
         {
-          "mode": "Tất cả",
-          "option": "Tất cả"
+          "mode": "Gọi Boss",
+          "option": "Không chọn"
+        },
+        {
+          "mode": "Bắn Boss",
+          "option": "Không chọn"
+        },
+        {
+          "mode": "Treo GP",
+          "option": "Không chọn"
+        },
+        {
+          "mode": "Treo Zombie",
+          "option": "Không chọn"
         }
       ]
     }
