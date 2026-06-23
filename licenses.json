@@ -38,21 +38,9 @@
     "permissions": {
       "allowed_combos": [
         {
-          "mode": "Gọi Boss",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Bắn Boss",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Treo GP",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Treo Zombie",
-          "option": "Không chọn"
-        }
+        "mode": "Tất cả",
+        "option": "Tất cả"
+      }
       ]
     }
   },
