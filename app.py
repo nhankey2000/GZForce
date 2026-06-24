@@ -425,6 +425,7 @@ HTML = """
 </div>
 <div class="toast" id="toast"></div>
 <script>
+window.INITIAL_LICENSES = {{ initial_licenses|tojson }};
 let currentExtendId = null;
 let currentPermissionId = null;
 let editPermissionCombos = [];
@@ -509,10 +510,14 @@ function initPermissionButtons(){
   if(clearBtn)clearBtn.onclick = clearAllowedCombos;
 }
 function initPage(){
-  renderPermissionPicker();
-  initPermissionButtons();
+  if (Array.isArray(window.INITIAL_LICENSES)) {
+    renderLicenseTable(window.INITIAL_LICENSES);
+    updateStats(window.INITIAL_LICENSES);
+    loadOnline();
+  }
   loadLicenses();
-  loadConfig();
+  try { renderPermissionPicker(); initPermissionButtons(); } catch(e) { console.error(e); }
+  try { loadConfig(); } catch(e) { console.error(e); }
   setInterval(loadLicenses,30000);
 }
 function formatPermissions(l){
@@ -548,11 +553,18 @@ async function saveRoomName() {
   else showToast('❌ Lỗi lưu config', 'error');
 }
 async function loadLicenses() {
-  const res = await fetch('/licenses');
-  const data = await res.json();
-  renderLicenseTable(data);
-  updateStats(data);
-  loadOnline();
+  const tbody = document.getElementById('license-tbody');
+  try {
+    const res = await fetch('/licenses');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderLicenseTable(data);
+    updateStats(data);
+    loadOnline();
+  } catch(e) {
+    console.error(e);
+    if (tbody) tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--red);padding:40px">Lỗi tải license: '+e.message+'</td></tr>';
+  }
 }
 async function loadOnline() {
   try {
@@ -584,9 +596,8 @@ function renderLicenseTable(data) {
     else{st='<span class="status status-active">Hoạt động</span>';dh='<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
     const perms=formatPermissions(l);
     const onlineCount = l.online_count || 0;
-    const onlineTitle = (l.online_users || []).map(u => u.device_name || u.device_id || u.online_id).join('\n');
     const online = onlineCount > 0
-      ? `<span class="status status-online" title="${onlineTitle}">Online · ${onlineCount} người</span>`
+      ? `<span class="status status-online">Online · ${onlineCount} người</span>`
       : '<span class="status status-offline">Offline</span>';
     const permData=encodeURIComponent(JSON.stringify(l.permissions||{allowed_combos:[]}));
     return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${online}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
@@ -635,12 +646,16 @@ async function deleteFile(name){if(!confirm('Xóa file '+name+'?'))return;const 
 function copyUrl(url){navigator.clipboard.writeText(url).then(()=>showToast('✓ Đã copy URL','success'));}
 function copyUrlBox(){const box=document.getElementById('file-url-box');if(box._url)navigator.clipboard.writeText(box._url).then(()=>showToast('✓ Đã copy URL','success'));}
 const dz=document.getElementById('drop-zone');
-dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
-dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const file=e.dataTransfer.files[0];if(file)uploadFile(file);});
+if (dz) {
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');const file=e.dataTransfer.files[0];if(file)uploadFile(file);});
+}
 function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';setTimeout(()=>t.className='toast',3000);}
-document.getElementById('modal-extend').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.getElementById('modal-permissions').addEventListener('click',function(e){if(e.target===this)closePermissionsModal();});
+const modalExtend=document.getElementById('modal-extend');
+if (modalExtend) modalExtend.addEventListener('click',function(e){if(e.target===this)closeModal();});
+const modalPermissions=document.getElementById('modal-permissions');
+if (modalPermissions) modalPermissions.addEventListener('click',function(e){if(e.target===this)closePermissionsModal();});
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPage);
 else initPage();
 </script>
@@ -662,7 +677,7 @@ def set_config():
 
 @app.route('/')
 def home():
-    return render_template_string(HTML)
+    return render_template_string(HTML, initial_licenses=build_license_rows())
 
 @app.route('/check-key', methods=['GET'])
 def check_key():
@@ -730,8 +745,7 @@ def heartbeat():
 def online_users():
     return jsonify(get_online_info())
 
-@app.route('/licenses', methods=['GET'])
-def list_licenses():
+def build_license_rows():
     licenses = load_licenses()
     now = today()
     online_info = get_online_info()
@@ -751,7 +765,11 @@ def list_licenses():
             'online_count': len(users),
             'online_users': users
         })
-    return jsonify(result)
+    return result
+
+@app.route('/licenses', methods=['GET'])
+def list_licenses():
+    return jsonify(build_license_rows())
 
 @app.route('/licenses', methods=['POST'])
 def add_license():
