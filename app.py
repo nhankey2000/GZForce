@@ -224,6 +224,8 @@ HTML = """
   .status-active{color:var(--green);background:rgba(0,230,118,.1);}
   .status-expired{color:var(--red);background:rgba(255,61,61,.1);}
   .status-warn{color:var(--amber);background:rgba(255,171,0,.1);}
+  .status-online{color:var(--green);background:rgba(0,230,118,.1);}
+  .status-offline{color:var(--sub);background:rgba(150,150,170,.08);}
   .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:48px;text-align:center;
     cursor:pointer;transition:all .2s;margin-bottom:16px;}
   .drop-zone:hover,.drop-zone.drag-over{border-color:var(--orange);background:rgba(255,122,0,.05);}
@@ -320,8 +322,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
-        <tbody id="license-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Online</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
+        <tbody id="license-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -573,7 +575,7 @@ function updateStats(data) {
 }
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
-  if (!data.length) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
+  if (!data.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
   tbody.innerHTML = data.map((l,i) => {
     const days=l.days_left, expireDate=l.expires_at.split('T')[0];
     let st,dh;
@@ -581,8 +583,13 @@ function renderLicenseTable(data) {
     else if(days<=7){st='<span class="status status-warn">Sắp hết</span>';dh='<span style="color:var(--amber);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
     else{st='<span class="status status-active">Hoạt động</span>';dh='<span style="color:var(--green);font-family:Share Tech Mono,monospace">'+days+' ngày</span>';}
     const perms=formatPermissions(l);
+    const onlineCount = l.online_count || 0;
+    const onlineTitle = (l.online_users || []).map(u => u.device_name || u.device_id || u.online_id).join('\n');
+    const online = onlineCount > 0
+      ? `<span class="status status-online" title="${onlineTitle}">Online · ${onlineCount} người</span>`
+      : '<span class="status status-offline">Offline</span>';
     const permData=encodeURIComponent(JSON.stringify(l.permissions||{allowed_combos:[]}));
-    return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
+    return `<tr><td style="color:var(--sub);font-family:Share Tech Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Share Tech Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${online}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
   }).join('');
 }
 async function addLicense() {
@@ -727,11 +734,23 @@ def online_users():
 def list_licenses():
     licenses = load_licenses()
     now = today()
+    online_info = get_online_info()
+    online_by_machine = {}
+    for user in online_info.get('users', []):
+        mid = user.get('machine_id', '')
+        online_by_machine.setdefault(mid, []).append(user)
     result = []
     for l in licenses:
         expire    = parse_date(l['expires_at'])
         days_left = (expire - now).days
-        result.append({**l, 'days_left': days_left, 'status': 'active' if days_left > 0 else 'expired'})
+        users = online_by_machine.get(l['machine_id'], [])
+        result.append({
+            **l,
+            'days_left': days_left,
+            'status': 'active' if days_left > 0 else 'expired',
+            'online_count': len(users),
+            'online_users': users
+        })
     return jsonify(result)
 
 @app.route('/licenses', methods=['POST'])
