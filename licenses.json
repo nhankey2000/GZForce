@@ -267,10 +267,10 @@
   },
   {
     "id": 19,
-    "name": "Hoàng Đông",
+    "name": "Tuan Anh",
     "machine_id": "TNDRAGON-0C8C4D19C780C85F",
     "created_at": "2026-06-25T00:00:00",
-    "expires_at": "2026-09-25T00:00:00",
+    "expires_at": "2026-09-28T00:00:00",
     "permissions": {
       "allowed_combos": [
         {
