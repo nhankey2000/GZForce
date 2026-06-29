@@ -22,6 +22,10 @@
         {
           "mode": "Treo GP",
           "option": "Không chọn"
+        },
+        {
+          "mode": "Chạy Theo",
+          "option": "Không chọn"
         }
       ]
     }
