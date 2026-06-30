@@ -1,15 +1,18 @@
-from flask import Flask, request, jsonify, render_template_string, send_from_directory
+from flask import Flask, request, jsonify, render_template_string, send_from_directory, session, redirect, url_for
 from datetime import datetime, timedelta, timezone
 from werkzeug.utils import secure_filename
 import json, os
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("TNDRAGON_ADMIN_SECRET", "TNDRAGON_ADMIN_LOCAL_SECRET_260820NN")
 LICENSES_FILE = "licenses.json"
 CONFIG_FILE   = "config.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
 ONLINE_TIMEOUT_SECONDS = 180
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "260820Nn"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ── Timezone UTC+7 ────────────────────────────────────────────────────────────
@@ -132,6 +135,85 @@ def normalize_permissions(raw):
                 seen.add(key)
     return {'allowed_combos': clean}
 
+LOGIN_HTML = """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng nhập TNDragon Admin</title>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<style>
+  *{box-sizing:border-box}
+  :root{--bg:#0a0a0f;--card:#111118;--field:#171720;--border:#303044;--orange:#ff7a00;--orange2:#ff8f22;--text:#f3f3f6;--muted:#9a9ab2;--red:#ff4545}
+  html,body{width:100%;min-height:100%}
+  body{margin:0;min-height:100vh;background:linear-gradient(rgba(5,5,10,.68),rgba(5,5,10,.78)),url('/backgroup.jpg') center center/cover no-repeat fixed;color:var(--text);font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
+  .box{width:390px;max-width:100%;background:rgba(17,17,24,.92);border:1px solid var(--border);border-top:4px solid var(--orange);border-radius:10px;padding:30px 28px;box-shadow:0 24px 60px rgba(0,0,0,.45);backdrop-filter:blur(6px)}
+  h1{margin:0 0 8px;color:var(--orange);font-size:24px;letter-spacing:.3px}
+  p{margin:0 0 24px;color:var(--muted);font-size:14px;line-height:1.5}
+  label{display:block;margin:14px 0 7px;color:#d8d8e6;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px}
+  input{width:100%;height:42px;padding:0 13px;border-radius:6px;border:1px solid var(--border);background:var(--field);color:#fff;outline:none;font-size:14px}
+  input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,0,.12)}
+  button{width:100%;margin-top:20px;padding:13px;border:0;border-radius:7px;background:linear-gradient(180deg,var(--orange2),var(--orange));color:#000;font-weight:800;letter-spacing:.5px;cursor:pointer}
+  button:hover{filter:brightness(1.05)}
+  .err{margin-top:15px;padding:10px 12px;border-radius:6px;background:rgba(255,69,69,.1);border:1px solid rgba(255,69,69,.35);color:var(--red);font-size:13px}
+</style>
+</head>
+<body>
+  <form class="box" method="post">
+    <h1>TNDRAGON ADMIN</h1>
+    <p>Đăng nhập để vào trang quản lý giấy phép và file cập nhật.</p>
+    <label>Tài khoản</label>
+    <input name="username" autocomplete="username" autofocus>
+    <label>Mật khẩu</label>
+    <input name="password" type="password" autocomplete="current-password">
+    <button type="submit">Đăng nhập</button>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  </form>
+</body>
+</html>
+"""
+
+PUBLIC_ENDPOINTS = {"login", "login_background", "favicon", "check_key", "heartbeat", "download_file", "static"}
+
+@app.before_request
+def require_admin_login():
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if session.get("admin_logged_in"):
+        return None
+    if request.path.startswith("/files/") and request.path.endswith("/download"):
+        return None
+    if request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
+        return jsonify({"error": "login_required"}), 401
+    return redirect(url_for("login", next=request.full_path))
+
+@app.route("/backgroup.jpg")
+def login_background():
+    return send_from_directory(".", "backgroup.jpg")
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(".", "Mario.ico")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip()
+        password = request.form.get("password") or ""
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["admin_logged_in"] = True
+            next_url = request.args.get("next") or url_for("home")
+            return redirect(next_url)
+        error = "Sai tài khoản hoặc mật khẩu"
+    return render_template_string(LOGIN_HTML, error=error)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -139,16 +221,16 @@ HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GZF License Manager</title>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0a0a0f;--card:#111118;--card2:#16161f;--border:#2a2a3a;
     --orange:#ff7a00;--orange2:#e06800;--green:#00e676;--red:#ff3d3d;
     --amber:#ffab00;--cyan:#00e5ff;--text:#f0f0f0;--sub:#666688;}
   *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;
-    background-image:radial-gradient(ellipse at 20% 20%,rgba(255,122,0,.04) 0%,transparent 60%),
-    radial-gradient(ellipse at 80% 80%,rgba(0,229,255,.03) 0%,transparent 60%);}
-  .header{background:var(--card);border-bottom:1px solid var(--border);padding:0 32px;
+  html,body{width:100%;min-height:100%;}
+  body{background:linear-gradient(rgba(5,5,10,.78),rgba(5,5,10,.86)),url('/backgroup.jpg') center center/cover no-repeat fixed;color:var(--text);font-family:'Rajdhani',sans-serif;min-height:100vh;}
+  .header{background:rgba(17,17,24,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:0 32px;
     display:flex;align-items:center;justify-content:space-between;height:64px;
     position:sticky;top:0;z-index:100;}
   .header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
@@ -168,10 +250,10 @@ HTML = """
   .badge-green{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);}
   .badge-red{color:var(--red);border-color:var(--red);background:rgba(255,61,61,.08);}
   .badge-amber{color:var(--amber);border-color:var(--amber);background:rgba(255,171,0,.08);}
-  .main{max-width:1200px;margin:0 auto;padding:32px 24px;}
+  .main{width:100%;max-width:1800px;margin:0 auto;padding:32px clamp(16px,2vw,36px);}
   .tab-page{display:none;}.tab-page.active{display:block;}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
-  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;
+  .stat-card{background:rgba(17,17,24,.92);border:1px solid var(--border);border-radius:10px;
     padding:20px;position:relative;overflow:hidden;}
   .stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;}
   .stat-card.s-total::after{background:var(--cyan);}
@@ -186,7 +268,7 @@ HTML = """
   .stat-card.s-warn .stat-num{color:var(--amber);}
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
   .section-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--orange);}
-  .card-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;}
+  .card-box{background:rgba(17,17,24,.92);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:24px;backdrop-filter:blur(6px);}
   .form-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end;}
   .form-group{display:flex;flex-direction:column;gap:6px;}
   .form-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;}
@@ -211,7 +293,7 @@ HTML = """
   .btn-green:hover{background:rgba(0,230,118,.15);}
   .btn-cyan{background:transparent;border:1px solid var(--cyan);color:var(--cyan);padding:6px 12px;font-size:12px;}
   .btn-cyan:hover{background:rgba(0,229,255,.15);}
-  .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;}
+  .table-wrap{background:rgba(17,17,24,.92);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;backdrop-filter:blur(6px);}
   table{width:100%;border-collapse:collapse;}
   thead{background:var(--card2);}
   th{padding:12px 16px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--sub);text-align:left;font-weight:600;}
@@ -280,6 +362,7 @@ HTML = """
     </div>
   </div>
   <div class="header-right">
+    <a class="badge badge-red" href="/logout" style="text-decoration:none">Đăng xuất</a>
     <span class="badge badge-green" id="badge-online">Online: 0</span>
     <span class="badge badge-green" id="badge-active">● 0 Active</span>
     <span class="badge badge-red"   id="badge-expired">● 0 Expired</span>
