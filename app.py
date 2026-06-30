@@ -270,9 +270,42 @@ HTML = """
     padding:12px 16px;font-family:'Roboto Mono',monospace;font-size:12px;color:var(--cyan);
     margin-top:12px;line-height:1.8;}
   @media(max-width:768px){
-    .stats{grid-template-columns:repeat(2,1fr);}
-    .form-grid{grid-template-columns:1fr;}
+    .header{height:auto;min-height:64px;padding:10px 12px;align-items:flex-start;gap:10px;overflow-x:auto;}
+    .header>div:first-child{min-width:max-content;gap:10px!important;}
+    .logo{font-size:16px;}
+    .logo span{font-size:10px;}
+    .nav-tabs{margin-left:8px;gap:6px;}
+    .nav-tab{padding:8px 12px;font-size:12px;letter-spacing:.5px;}
+    .header-right{min-width:max-content;gap:6px;}
+    .badge{font-size:10px;padding:4px 8px;}
+    .main{width:100%;max-width:none;padding:18px 12px;}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .stat-card{padding:16px 14px;min-width:0;}
+    .stat-label{font-size:11px;}
+    .stat-num{font-size:30px;}
+    .card-box{padding:18px 14px;border-radius:8px;}
+    .form-grid{grid-template-columns:1fr;gap:12px;}
+    .perm-row{grid-template-columns:1fr;gap:10px;}
+    .perm-row[style]{grid-template-columns:1fr!important;}
+    .perm-box{padding:12px;overflow:hidden;}
+    .perm-row>*{min-width:0;}
+    .perm-text{min-height:82px;}
+    .btn{width:100%;text-align:center;}
+    .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    table{min-width:980px;}
+    th,td{padding:12px 10px;font-size:12px;}
+    .actions{gap:6px;flex-wrap:nowrap;}
     .settings-grid{grid-template-columns:1fr;}
+    .modal{width:calc(100vw - 28px);padding:22px;}
+    .toast{left:12px;right:12px;bottom:12px;}
+  }
+  @media(max-width:420px){
+    .main{padding:14px 8px;}
+    .stats{gap:10px;}
+    .stat-card{padding:14px 12px;}
+    .card-box{padding:16px 12px;}
+    .form-input{font-size:13px;padding:10px 12px;}
+    .section-title{font-size:12px;}
   }
 </style>
 </head>
