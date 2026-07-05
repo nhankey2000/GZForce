@@ -316,4 +316,21 @@
       ]
     }
   }
+  ,
+   
+  {
+    "id": 2,
+    "name": "Miễn Phí",
+    "machine_id": "Miễn Phí",
+    "created_at": "2026-06-08T00:00:00",
+    "expires_at": "2026-08-25T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        {
+          "mode": "Tất cả",
+          "option": "Tất cả"
+        }
+      ]
+    }
+  }
 ]
