@@ -113,6 +113,9 @@
         {
           "mode": "Tất cả",
           "option": "Tất cả"
+        },{
+          "mode": "Bug DT",
+          "option": "Tất cả"
         }
       ]
     }
@@ -129,6 +132,7 @@
           "mode": "Tất cả",
           "option": "Tất cả"
         }
+        
       ]
     }
   },
