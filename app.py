@@ -5,6 +5,7 @@ import json, os
 
 app = Flask(__name__)
 LICENSES_FILE = "licenses.json"
+BUG_LICENSES_FILE = "licensesBug.json"
 CONFIG_FILE   = "config.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
@@ -36,6 +37,29 @@ def load_licenses():
 def save_licenses(licenses):
     with open(LICENSES_FILE, 'w', encoding='utf-8') as f:
         json.dump(licenses, f, ensure_ascii=False, indent=2)
+
+def load_bug_licenses():
+    if not os.path.exists(BUG_LICENSES_FILE):
+        return []
+    try:
+        with open(BUG_LICENSES_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+def save_bug_licenses(licenses):
+    with open(BUG_LICENSES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(licenses, f, ensure_ascii=False, indent=2)
+
+def normalize_bug_license(item, index=0):
+    return {
+        'id': int(item.get('id') or index + 1),
+        'name': str(item.get('name', '')).strip(),
+        'machine_id': str(item.get('machine_id', '')).strip(),
+        'active': bool(item.get('active', True)),
+        'created_at': item.get('created_at') or now_vn().isoformat()
+    }
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
@@ -316,6 +340,7 @@ HTML = """
     <div id="header-room" class="logo-room" style="display:none"></div>
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
+      <div class="nav-tab" id="tab-btn-license-bug" onclick="switchTab('license-bug',this)">🔑 LICENSE-BUG</div>
       <div class="nav-tab" id="tab-btn-files"    onclick="switchTab('files',this)">📦 FILES</div>
       <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings',this)">⚙ SETTINGS</div>
     </div>
@@ -365,6 +390,30 @@ HTML = """
       <table>
         <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Online</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
         <tbody id="license-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="tab-page" id="tab-license-bug">
+    <div class="card-box">
+      <div class="section-title" style="margin-bottom:16px">Thêm License BugDT</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1.4fr auto auto">
+        <div class="form-group"><label class="form-label">Tên</label>
+          <input class="form-input" id="bug-inp-name" placeholder="Nguyen Van A"/></div>
+        <div class="form-group"><label class="form-label">Machine ID</label>
+          <input class="form-input" id="bug-inp-mid" placeholder="TNDRAGON-..."/></div>
+        <div class="form-group"><label class="form-label">Trạng thái</label>
+          <select class="form-input" id="bug-inp-active"><option value="true">Kích hoạt</option><option value="false">Tắt</option></select></div>
+        <button class="btn btn-orange" onclick="addBugLicense()">+ THÊM</button>
+      </div>
+    </div>
+    <div class="section-header">
+      <div class="section-title">Danh Sách License BugDT</div>
+      <span style="font-size:12px;color:var(--sub)" id="bug-total-count">0 license</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
+        <tbody id="bug-license-tbody"><tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -557,6 +606,7 @@ function initPage(){
     loadOnline();
   }
   loadLicenses();
+  loadBugLicenses();
   try { renderPermissionPicker(); initPermissionButtons(); } catch(e) { console.error(e); }
   try { loadConfig(); } catch(e) { console.error(e); }
   setInterval(loadLicenses,30000);
@@ -571,6 +621,7 @@ function switchTab(tab, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
+  if (tab === 'license-bug') loadBugLicenses();
   if (tab === 'files') loadFiles();
   if (tab === 'settings') loadConfig();
 }
@@ -657,6 +708,56 @@ async function deleteLicense(mid,name){
   if(!confirm('Xóa license của '+name+'?'))return;
   await fetch('/licenses/'+mid,{method:'DELETE'});
   showToast('✓ Đã xóa: '+name,'success');loadLicenses();
+}
+async function loadBugLicenses() {
+  const tbody = document.getElementById('bug-license-tbody');
+  if (!tbody) return;
+  try {
+    const res = await fetch('/bug-licenses');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderBugLicenseTable(data);
+  } catch(e) {
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--red);padding:40px">Lỗi tải license BugDT: '+e.message+'</td></tr>';
+  }
+}
+function renderBugLicenseTable(data) {
+  const tbody = document.getElementById('bug-license-tbody');
+  const total = document.getElementById('bug-total-count');
+  if (total) total.textContent = data.length + ' license';
+  if (!data.length) {
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Chưa có license BugDT nào</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((l,i) => {
+    const active = !!l.active;
+    const st = active ? '<span class="status status-active">Kích hoạt</span>' : '<span class="status status-expired">Đã tắt</span>';
+    const btn = active
+      ? `<button class="btn btn-red" onclick="toggleBugLicense('${l.machine_id}',false)">Tắt</button>`
+      : `<button class="btn btn-green" onclick="toggleBugLicense('${l.machine_id}',true)">Kích Hoạt</button>`;
+    const created = (l.created_at || '').split('T')[0] || '';
+    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td>${st}</td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${created}</td><td><div class="actions">${btn}<button class="btn btn-red" onclick="deleteBugLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
+  }).join('');
+}
+async function addBugLicense() {
+  const name=document.getElementById('bug-inp-name').value.trim();
+  const mid=document.getElementById('bug-inp-mid').value.trim();
+  const active=document.getElementById('bug-inp-active').value === 'true';
+  if(!name||!mid){showToast('Điền tên và Machine ID BugDT!','error');return;}
+  const res=await fetch('/bug-licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,active})});
+  const data=await res.json();
+  if(res.ok){showToast('✓ Đã thêm BugDT: '+name,'success');document.getElementById('bug-inp-name').value='';document.getElementById('bug-inp-mid').value='';loadBugLicenses();}
+  else showToast('❌ '+(data.error||'Lỗi'),'error');
+}
+async function toggleBugLicense(mid, active) {
+  const res=await fetch('/bug-licenses/'+mid+'/active',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})});
+  if(res.ok){showToast(active ? '✓ Đã kích hoạt BugDT' : '✓ Đã tắt BugDT','success');loadBugLicenses();}
+  else showToast('❌ Lỗi đổi trạng thái','error');
+}
+async function deleteBugLicense(mid,name){
+  if(!confirm('Xóa license BugDT của '+name+'?'))return;
+  await fetch('/bug-licenses/'+mid,{method:'DELETE'});
+  showToast('✓ Đã xóa BugDT: '+name,'success');loadBugLicenses();
 }
 function openExtend(mid,daysLeft){currentExtendId=mid;document.getElementById('extend-info').textContent='Machine ID: '+mid+' · Còn '+daysLeft+' ngày';document.getElementById('modal-extend').classList.add('active');}
 function closeModal(){document.getElementById('modal-extend').classList.remove('active');currentExtendId=null;}
@@ -782,9 +883,71 @@ def heartbeat():
     save_online(online)
     return jsonify({'success': True, **get_online_info()}), 200
 
+@app.route('/check-bug-key', methods=['GET'])
+def check_bug_key():
+    machine_id = request.args.get('machine_id') or request.args.get('id')
+    device_id = request.args.get('device_id')
+    device_name = request.args.get('device_name', '')
+    if not machine_id:
+        return jsonify({'error': 'missing_machine_id'}), 400
+    licenses = load_bug_licenses()
+    lic = next((l for l in licenses if l.get('machine_id') == machine_id), None)
+    if not lic:
+        return jsonify({'error': 'not_found'}), 404
+    if not bool(lic.get('active', True)):
+        return jsonify({'error': 'inactive'}), 403
+    online = load_online()
+    online_id = 'BUG-' + get_online_key(machine_id, device_id)
+    online[online_id] = {
+        'machine_id': machine_id,
+        'device_id': device_id or online_id,
+        'device_name': device_name,
+        'name': lic.get('name', ''),
+        'tool': 'BugDT',
+        'last_seen': now_vn().isoformat()
+    }
+    save_online(online)
+    return jsonify({
+        'valid': True,
+        'name': lic.get('name', ''),
+        'machine_id': machine_id,
+        'active': True
+    }), 200
+
+@app.route('/heartbeat-bug', methods=['POST'])
+def heartbeat_bug():
+    data = request.json or {}
+    machine_id = data.get('machine_id') or data.get('id')
+    device_id = data.get('device_id')
+    device_name = data.get('device_name', '')
+    if not machine_id:
+        return jsonify({'error': 'missing_machine_id'}), 400
+    licenses = load_bug_licenses()
+    lic = next((l for l in licenses if l.get('machine_id') == machine_id), None)
+    if not lic:
+        return jsonify({'error': 'not_found'}), 404
+    if not bool(lic.get('active', True)):
+        return jsonify({'error': 'inactive'}), 403
+    online = load_online()
+    online_id = 'BUG-' + get_online_key(machine_id, device_id)
+    online[online_id] = {
+        'machine_id': machine_id,
+        'device_id': device_id or online_id,
+        'device_name': device_name,
+        'name': lic.get('name', data.get('name', '')),
+        'tool': 'BugDT',
+        'last_seen': now_vn().isoformat()
+    }
+    save_online(online)
+    return jsonify({'success': True, **get_online_info()}), 200
+
 @app.route('/online', methods=['GET'])
 def online_users():
     return jsonify(get_online_info())
+
+def build_bug_license_rows():
+    licenses = [normalize_bug_license(item, i) for i, item in enumerate(load_bug_licenses())]
+    return licenses
 
 def build_license_rows():
     licenses = load_licenses()
@@ -864,6 +1027,50 @@ def extend_license(machine_id):
             save_licenses(licenses)
             return jsonify({'success': True, 'new_expire': l['expires_at']})
     return jsonify({'error': 'not_found'}), 404
+
+@app.route('/bug-licenses', methods=['GET'])
+def list_bug_licenses():
+    return jsonify(build_bug_license_rows())
+
+@app.route('/bug-licenses', methods=['POST'])
+def add_bug_license():
+    data = request.json or {}
+    machine_id = str(data.get('machine_id', '')).strip()
+    name = str(data.get('name', '')).strip()
+    if not name or not machine_id:
+        return jsonify({'error': 'Thiếu tên hoặc machine_id'}), 400
+    licenses = build_bug_license_rows()
+    if any(l.get('machine_id') == machine_id for l in licenses):
+        return jsonify({'error': 'machine_id BugDT đã tồn tại'}), 400
+    new_lic = {
+        'id': len(licenses) + 1,
+        'name': name,
+        'machine_id': machine_id,
+        'active': bool(data.get('active', True)),
+        'created_at': now_vn().isoformat()
+    }
+    licenses.append(new_lic)
+    save_bug_licenses(licenses)
+    return jsonify(new_lic), 201
+
+@app.route('/bug-licenses/<machine_id>/active', methods=['POST'])
+def set_bug_license_active(machine_id):
+    data = request.json or {}
+    licenses = build_bug_license_rows()
+    for l in licenses:
+        if l.get('machine_id') == machine_id:
+            l['active'] = bool(data.get('active', True))
+            save_bug_licenses(licenses)
+            return jsonify({'success': True, 'active': l['active']})
+    return jsonify({'error': 'not_found'}), 404
+
+@app.route('/bug-licenses/<machine_id>', methods=['DELETE'])
+def delete_bug_license(machine_id):
+    licenses = [l for l in build_bug_license_rows() if l.get('machine_id') != machine_id]
+    for i, l in enumerate(licenses, start=1):
+        l['id'] = i
+    save_bug_licenses(licenses)
+    return jsonify({'success': True})
 
 @app.route('/files', methods=['GET'])
 def list_files():
