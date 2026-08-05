@@ -6,6 +6,8 @@ import json, os
 app = Flask(__name__)
 LICENSES_FILE = "licenses.json"
 BUG_LICENSES_FILE = "licensesBug.json"
+CALLBOSS_ACCOUNTS_FILE = "accountsCallBoss.json"
+CALLBOSS_ONLINE_FILE = "onlineCallBoss.json"
 CONFIG_FILE   = "config.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
@@ -44,7 +46,11 @@ def load_bug_licenses():
     try:
         with open(BUG_LICENSES_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        return data if isinstance(data, list) else []
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return [data]
+        return []
     except Exception:
         return []
 
@@ -52,11 +58,70 @@ def save_bug_licenses(licenses):
     with open(BUG_LICENSES_FILE, 'w', encoding='utf-8') as f:
         json.dump(licenses, f, ensure_ascii=False, indent=2)
 
+def load_callboss_accounts():
+    if not os.path.exists(CALLBOSS_ACCOUNTS_FILE):
+        return []
+    try:
+        with open(CALLBOSS_ACCOUNTS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return [data]
+        return []
+    except Exception:
+        return []
+
+def save_callboss_accounts(accounts):
+    with open(CALLBOSS_ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(accounts, f, ensure_ascii=False, indent=2)
+
+def load_callboss_online_raw():
+    if not os.path.exists(CALLBOSS_ONLINE_FILE):
+        return {}
+    try:
+        with open(CALLBOSS_ONLINE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_callboss_online(data):
+    with open(CALLBOSS_ONLINE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_callboss_online():
+    now = now_vn()
+    raw = load_callboss_online_raw()
+    online = {}
+    for username, info in raw.items():
+        try:
+            last_seen = datetime.fromisoformat(info.get('last_seen', ''))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=TZ_VN)
+            if (now - last_seen).total_seconds() <= ONLINE_TIMEOUT_SECONDS:
+                online[username] = info
+        except Exception:
+            pass
+    if len(online) != len(raw):
+        save_callboss_online(online)
+    return online
+
 def normalize_bug_license(item, index=0):
     return {
         'id': int(item.get('id') or index + 1),
         'name': str(item.get('name', '')).strip(),
         'machine_id': str(item.get('machine_id', '')).strip(),
+        'active': bool(item.get('active', True)),
+        'created_at': item.get('created_at') or now_vn().isoformat()
+    }
+
+def normalize_callboss_account(item, index=0):
+    return {
+        'id': int(item.get('id') or index + 1),
+        'username': str(item.get('username', '')).strip(),
+        'password': str(item.get('password', '')).strip(),
+        'name': str(item.get('name', '')).strip(),
         'active': bool(item.get('active', True)),
         'created_at': item.get('created_at') or now_vn().isoformat()
     }
@@ -341,6 +406,7 @@ HTML = """
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
       <div class="nav-tab" id="tab-btn-license-bug" onclick="switchTab('license-bug',this)">🔑 LICENSE-BUG</div>
+      <div class="nav-tab" id="tab-btn-account-callboss" onclick="switchTab('account-callboss',this)">👤 ACCOUNT-CALLBOSS</div>
       <div class="nav-tab" id="tab-btn-files"    onclick="switchTab('files',this)">📦 FILES</div>
       <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings',this)">⚙ SETTINGS</div>
     </div>
@@ -414,6 +480,32 @@ HTML = """
       <table>
         <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
         <tbody id="bug-license-tbody"><tr><td colspan="6" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="tab-page" id="tab-account-callboss">
+    <div class="card-box">
+      <div class="section-title" style="margin-bottom:16px">Thêm Account CallBossNet</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto auto">
+        <div class="form-group"><label class="form-label">Tên hiển thị</label>
+          <input class="form-input" id="callboss-inp-name" placeholder="Thành Nhân"/></div>
+        <div class="form-group"><label class="form-label">Tài khoản</label>
+          <input class="form-input" id="callboss-inp-user" placeholder="admin"/></div>
+        <div class="form-group"><label class="form-label">Mật khẩu</label>
+          <input class="form-input" id="callboss-inp-pass" placeholder="admin"/></div>
+        <div class="form-group"><label class="form-label">Trạng thái</label>
+          <select class="form-input" id="callboss-inp-active"><option value="true">Kích hoạt</option><option value="false">Tắt</option></select></div>
+        <button class="btn btn-orange" onclick="addCallbossAccount()">+ THÊM</button>
+      </div>
+    </div>
+    <div class="section-header">
+      <div class="section-title">Danh Sách Account CallBossNet</div>
+      <span style="font-size:12px;color:var(--sub)" id="callboss-total-count">0 account</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Tên</th><th>Tài Khoản</th><th>Mật Khẩu</th><th>Online</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
+        <tbody id="callboss-account-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -607,6 +699,7 @@ function initPage(){
   }
   loadLicenses();
   loadBugLicenses();
+  loadCallbossAccounts();
   try { renderPermissionPicker(); initPermissionButtons(); } catch(e) { console.error(e); }
   try { loadConfig(); } catch(e) { console.error(e); }
   setInterval(loadLicenses,30000);
@@ -622,6 +715,7 @@ function switchTab(tab, el) {
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   if (tab === 'license-bug') loadBugLicenses();
+  if (tab === 'account-callboss') loadCallbossAccounts();
   if (tab === 'files') loadFiles();
   if (tab === 'settings') loadConfig();
 }
@@ -758,6 +852,72 @@ async function deleteBugLicense(mid,name){
   if(!confirm('Xóa license BugDT của '+name+'?'))return;
   await fetch('/bug-licenses/'+mid,{method:'DELETE'});
   showToast('✓ Đã xóa BugDT: '+name,'success');loadBugLicenses();
+}
+async function loadCallbossAccounts() {
+  const tbody = document.getElementById('callboss-account-tbody');
+  if (!tbody) return;
+  try {
+    const res = await fetch('/callboss-accounts');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderCallbossAccountTable(data);
+  } catch(e) {
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--red);padding:40px">Lỗi tải account CallBossNet: '+e.message+'</td></tr>';
+  }
+}
+function maskPassword(p) {
+  p = String(p || '');
+  if (!p) return '';
+  if (p.length <= 2) return '•'.repeat(p.length);
+  return p[0] + '•'.repeat(Math.min(8, p.length - 2)) + p[p.length - 1];
+}
+function renderCallbossAccountTable(data) {
+  const tbody = document.getElementById('callboss-account-tbody');
+  const total = document.getElementById('callboss-total-count');
+  if (total) total.textContent = data.length + ' account';
+  if (!data.length) {
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có account CallBossNet nào</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((a,i) => {
+    const active = !!a.active;
+    const st = active ? '<span class="status status-active">Kích hoạt</span>' : '<span class="status status-expired">Đã tắt</span>';
+    const online = a.online
+      ? `<span class="status status-online" title="${a.online_device_id || ''}">Online</span>`
+      : '<span class="status status-offline">Offline</span>';
+    const btn = active
+      ? `<button class="btn btn-red" onclick="toggleCallbossAccount('${a.username}',false)">Tắt</button>`
+      : `<button class="btn btn-green" onclick="toggleCallbossAccount('${a.username}',true)">Kích Hoạt</button>`;
+    const kick = a.online ? `<button class="btn btn-amber" onclick="kickCallbossAccount('${a.username}')">Đá</button>` : '';
+    const created = (a.created_at || '').split('T')[0] || '';
+    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${a.name || ''}</td><td><span class="mono">${a.username}</span></td><td><span class="mono">${maskPassword(a.password)}</span></td><td>${online}</td><td>${st}</td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${created}</td><td><div class="actions">${btn}${kick}<button class="btn btn-red" onclick="deleteCallbossAccount('${a.username}','${a.name || a.username}')">Xóa</button></div></td></tr>`;
+  }).join('');
+}
+async function addCallbossAccount() {
+  const name=document.getElementById('callboss-inp-name').value.trim();
+  const username=document.getElementById('callboss-inp-user').value.trim();
+  const password=document.getElementById('callboss-inp-pass').value.trim();
+  const active=document.getElementById('callboss-inp-active').value === 'true';
+  if(!username||!password){showToast('Điền tài khoản và mật khẩu CallBossNet!','error');return;}
+  const res=await fetch('/callboss-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,username,password,active})});
+  const data=await res.json();
+  if(res.ok){showToast('✓ Đã thêm CallBossNet: '+username,'success');document.getElementById('callboss-inp-name').value='';document.getElementById('callboss-inp-user').value='';document.getElementById('callboss-inp-pass').value='';loadCallbossAccounts();}
+  else showToast('❌ '+(data.error||'Lỗi'),'error');
+}
+async function toggleCallbossAccount(username, active) {
+  const res=await fetch('/callboss-accounts/'+encodeURIComponent(username)+'/active',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active})});
+  if(res.ok){showToast(active ? '✓ Đã kích hoạt CallBossNet' : '✓ Đã tắt CallBossNet','success');loadCallbossAccounts();}
+  else showToast('❌ Lỗi đổi trạng thái','error');
+}
+async function deleteCallbossAccount(username,name){
+  if(!confirm('Xóa account CallBossNet của '+name+'?'))return;
+  await fetch('/callboss-accounts/'+encodeURIComponent(username),{method:'DELETE'});
+  showToast('✓ Đã xóa CallBossNet: '+name,'success');loadCallbossAccounts();
+}
+async function kickCallbossAccount(username){
+  const res=await fetch('/callboss-accounts/'+encodeURIComponent(username)+'/kick',{method:'POST'});
+  if(res.ok){showToast('✓ Đã đá account CallBossNet','success');loadCallbossAccounts();}
+  else showToast('❌ Lỗi đá account','error');
 }
 function openExtend(mid,daysLeft){currentExtendId=mid;document.getElementById('extend-info').textContent='Machine ID: '+mid+' · Còn '+daysLeft+' ngày';document.getElementById('modal-extend').classList.add('active');}
 function closeModal(){document.getElementById('modal-extend').classList.remove('active');currentExtendId=null;}
@@ -949,6 +1109,17 @@ def build_bug_license_rows():
     licenses = [normalize_bug_license(item, i) for i, item in enumerate(load_bug_licenses())]
     return licenses
 
+def build_callboss_account_rows():
+    accounts = [normalize_callboss_account(item, i) for i, item in enumerate(load_callboss_accounts())]
+    online = get_callboss_online()
+    for acc in accounts:
+        info = online.get(acc.get('username'))
+        acc['online'] = bool(info)
+        acc['online_device_id'] = info.get('device_id', '') if info else ''
+        acc['online_device_name'] = info.get('device_name', '') if info else ''
+        acc['last_seen'] = info.get('last_seen', '') if info else ''
+    return accounts
+
 def build_license_rows():
     licenses = load_licenses()
     now = today()
@@ -1070,6 +1241,147 @@ def delete_bug_license(machine_id):
     for i, l in enumerate(licenses, start=1):
         l['id'] = i
     save_bug_licenses(licenses)
+    return jsonify({'success': True})
+
+@app.route('/callboss-login', methods=['POST'])
+def callboss_login():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    if not username or not password:
+        return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
+    if not device_id:
+        return jsonify({'valid': False, 'error': 'missing_device_id'}), 400
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'valid': False, 'error': 'not_found'}), 404
+    if not bool(acc.get('active', True)):
+        return jsonify({'valid': False, 'error': 'inactive'}), 403
+    if acc.get('password') != password:
+        return jsonify({'valid': False, 'error': 'wrong_password'}), 403
+    online = get_callboss_online()
+    current = online.get(username)
+    if current and current.get('device_id') != device_id:
+        return jsonify({
+            'valid': False,
+            'error': 'already_online',
+            'online_device_id': current.get('device_id', ''),
+            'online_device_name': current.get('device_name', ''),
+            'last_seen': current.get('last_seen', '')
+        }), 409
+    online[username] = {
+        'username': username,
+        'device_id': device_id,
+        'device_name': device_name,
+        'name': acc.get('name', ''),
+        'last_seen': now_vn().isoformat()
+    }
+    save_callboss_online(online)
+    return jsonify({
+        'valid': True,
+        'name': acc.get('name', ''),
+        'username': acc.get('username', ''),
+        'device_id': device_id,
+        'active': True
+    }), 200
+
+@app.route('/callboss-heartbeat', methods=['POST'])
+def callboss_heartbeat():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    if not username or not device_id:
+        return jsonify({'success': False, 'error': 'missing_username_or_device_id'}), 400
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'success': False, 'error': 'not_found'}), 404
+    if not bool(acc.get('active', True)):
+        return jsonify({'success': False, 'error': 'inactive'}), 403
+    online = get_callboss_online()
+    current = online.get(username)
+    if current and current.get('device_id') != device_id:
+        return jsonify({'success': False, 'error': 'kicked_by_other_device'}), 409
+    online[username] = {
+        'username': username,
+        'device_id': device_id,
+        'device_name': device_name,
+        'name': acc.get('name', ''),
+        'last_seen': now_vn().isoformat()
+    }
+    save_callboss_online(online)
+    return jsonify({'success': True}), 200
+
+@app.route('/callboss-logout', methods=['POST'])
+def callboss_logout():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    online = get_callboss_online()
+    current = online.get(username)
+    if current and (not device_id or current.get('device_id') == device_id):
+        online.pop(username, None)
+        save_callboss_online(online)
+    return jsonify({'success': True}), 200
+
+@app.route('/callboss-accounts', methods=['GET'])
+def list_callboss_accounts():
+    return jsonify(build_callboss_account_rows())
+
+@app.route('/callboss-accounts', methods=['POST'])
+def add_callboss_account():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
+    name = str(data.get('name', '')).strip()
+    if not username or not password:
+        return jsonify({'error': 'Thiếu tài khoản hoặc mật khẩu'}), 400
+    accounts = build_callboss_account_rows()
+    if any(a.get('username') == username for a in accounts):
+        return jsonify({'error': 'Tài khoản CallBossNet đã tồn tại'}), 400
+    new_acc = {
+        'id': len(accounts) + 1,
+        'name': name,
+        'username': username,
+        'password': password,
+        'active': bool(data.get('active', True)),
+        'created_at': now_vn().isoformat()
+    }
+    accounts.append(new_acc)
+    save_callboss_accounts(accounts)
+    return jsonify(new_acc), 201
+
+@app.route('/callboss-accounts/<username>/active', methods=['POST'])
+def set_callboss_account_active(username):
+    data = request.json or {}
+    accounts = build_callboss_account_rows()
+    for a in accounts:
+        if a.get('username') == username:
+            a['active'] = bool(data.get('active', True))
+            save_callboss_accounts(accounts)
+            return jsonify({'success': True, 'active': a['active']})
+    return jsonify({'error': 'not_found'}), 404
+
+@app.route('/callboss-accounts/<username>/kick', methods=['POST'])
+def kick_callboss_account(username):
+    online = get_callboss_online()
+    online.pop(username, None)
+    save_callboss_online(online)
+    return jsonify({'success': True})
+
+@app.route('/callboss-accounts/<username>', methods=['DELETE'])
+def delete_callboss_account(username):
+    accounts = [a for a in build_callboss_account_rows() if a.get('username') != username]
+    for i, a in enumerate(accounts, start=1):
+        a['id'] = i
+    save_callboss_accounts(accounts)
+    online = get_callboss_online()
+    online.pop(username, None)
+    save_callboss_online(online)
     return jsonify({'success': True})
 
 @app.route('/files', methods=['GET'])
