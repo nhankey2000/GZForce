@@ -8,6 +8,7 @@ LICENSES_FILE = "licenses.json"
 BUG_LICENSES_FILE = "licensesBug.json"
 CALLBOSS_ACCOUNTS_FILE = "accountsCallBoss.json"
 CALLBOSS_ONLINE_FILE = "onlineCallBoss.json"
+CALLBOSS_NOMAC_ONLINE_FILE = "onlineCallBossNoMac.json"
 CONFIG_FILE   = "config.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
@@ -105,6 +106,37 @@ def get_callboss_online():
             pass
     if len(online) != len(raw):
         save_callboss_online(online)
+    return online
+
+def load_callboss_nomac_online_raw():
+    if not os.path.exists(CALLBOSS_NOMAC_ONLINE_FILE):
+        return {}
+    try:
+        with open(CALLBOSS_NOMAC_ONLINE_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_callboss_nomac_online(data):
+    with open(CALLBOSS_NOMAC_ONLINE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_callboss_nomac_online():
+    now = now_vn()
+    raw = load_callboss_nomac_online_raw()
+    online = {}
+    for session_id, info in raw.items():
+        try:
+            last_seen = datetime.fromisoformat(info.get('last_seen', ''))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=TZ_VN)
+            if (now - last_seen).total_seconds() <= ONLINE_TIMEOUT_SECONDS:
+                online[session_id] = info
+        except Exception:
+            pass
+    if len(online) != len(raw):
+        save_callboss_nomac_online(online)
     return online
 
 def normalize_bug_license(item, index=0):
@@ -882,13 +914,15 @@ function renderCallbossAccountTable(data) {
   tbody.innerHTML = data.map((a,i) => {
     const active = !!a.active;
     const st = active ? '<span class="status status-active">Kích hoạt</span>' : '<span class="status status-expired">Đã tắt</span>';
-    const online = a.online
-      ? `<span class="status status-online" title="${a.online_device_id || ''}">Online</span>`
-      : '<span class="status status-offline">Offline</span>';
+    const nomacCount = a.nomac_online_count || 0;
+    const onlineParts = [];
+    if (a.online) onlineParts.push(`<span class="status status-online" title="${a.online_device_id || ''}">Online</span>`);
+    if (nomacCount > 0) onlineParts.push(`<span class="status status-online">NoMac · ${nomacCount} người</span>`);
+    const online = onlineParts.length ? onlineParts.join(' ') : '<span class="status status-offline">Offline</span>';
     const btn = active
       ? `<button class="btn btn-red" onclick="toggleCallbossAccount('${a.username}',false)">Tắt</button>`
       : `<button class="btn btn-green" onclick="toggleCallbossAccount('${a.username}',true)">Kích Hoạt</button>`;
-    const kick = a.online ? `<button class="btn btn-amber" onclick="kickCallbossAccount('${a.username}')">Đá</button>` : '';
+    const kick = (a.online || nomacCount > 0) ? `<button class="btn btn-amber" onclick="kickCallbossAccount('${a.username}')">Đá</button>` : '';
     const created = (a.created_at || '').split('T')[0] || '';
     return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${a.name || ''}</td><td><span class="mono">${a.username}</span></td><td><span class="mono">${maskPassword(a.password)}</span></td><td>${online}</td><td>${st}</td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${created}</td><td><div class="actions">${btn}${kick}<button class="btn btn-red" onclick="deleteCallbossAccount('${a.username}','${a.name || a.username}')">Xóa</button></div></td></tr>`;
   }).join('');
@@ -1112,12 +1146,21 @@ def build_bug_license_rows():
 def build_callboss_account_rows():
     accounts = [normalize_callboss_account(item, i) for i, item in enumerate(load_callboss_accounts())]
     online = get_callboss_online()
+    nomac_online = get_callboss_nomac_online()
+    nomac_by_username = {}
+    for info in nomac_online.values():
+        username = info.get('username', '')
+        if username:
+            nomac_by_username.setdefault(username, []).append(info)
     for acc in accounts:
         info = online.get(acc.get('username'))
+        nomac_users = nomac_by_username.get(acc.get('username'), [])
         acc['online'] = bool(info)
         acc['online_device_id'] = info.get('device_id', '') if info else ''
         acc['online_device_name'] = info.get('device_name', '') if info else ''
         acc['last_seen'] = info.get('last_seen', '') if info else ''
+        acc['nomac_online_count'] = len(nomac_users)
+        acc['nomac_online_users'] = nomac_users
     return accounts
 
 def build_license_rows():
@@ -1291,6 +1334,44 @@ def callboss_login():
         'active': True
     }), 200
 
+@app.route('/callboss-login-nomac', methods=['POST'])
+def callboss_login_nomac():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
+    if not username or not password:
+        return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'valid': False, 'error': 'not_found'}), 404
+    if not bool(acc.get('active', True)):
+        return jsonify({'valid': False, 'error': 'inactive'}), 403
+    if acc.get('password') != password:
+        return jsonify({'valid': False, 'error': 'wrong_password'}), 403
+    if session_id:
+        online = get_callboss_nomac_online()
+        online[session_id] = {
+            'username': username,
+            'device_id': device_id,
+            'device_name': device_name,
+            'session_id': session_id,
+            'name': acc.get('name', ''),
+            'last_seen': now_vn().isoformat()
+        }
+        save_callboss_nomac_online(online)
+    return jsonify({
+        'valid': True,
+        'name': acc.get('name', ''),
+        'username': acc.get('username', ''),
+        'device_id': device_id,
+        'active': True,
+        'no_limit': True
+    }), 200
+
 @app.route('/callboss-heartbeat', methods=['POST'])
 def callboss_heartbeat():
     data = request.json or {}
@@ -1319,6 +1400,44 @@ def callboss_heartbeat():
         'last_seen': now_vn().isoformat()
     }
     save_callboss_online(online)
+    return jsonify({'success': True}), 200
+
+@app.route('/callboss-heartbeat-nomac', methods=['POST'])
+def callboss_heartbeat_nomac():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
+    if not username:
+        return jsonify({'success': False, 'error': 'missing_username'}), 400
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'success': False, 'error': 'not_found'}), 404
+    if not bool(acc.get('active', True)):
+        return jsonify({'success': False, 'error': 'inactive'}), 403
+    if session_id:
+        online = get_callboss_nomac_online()
+        online[session_id] = {
+            'username': username,
+            'device_id': device_id,
+            'device_name': device_name,
+            'session_id': session_id,
+            'name': acc.get('name', ''),
+            'last_seen': now_vn().isoformat()
+        }
+        save_callboss_nomac_online(online)
+    return jsonify({'success': True, 'no_limit': True}), 200
+
+@app.route('/callboss-logout-nomac', methods=['POST'])
+def callboss_logout_nomac():
+    data = request.json or {}
+    session_id = str(data.get('session_id', '')).strip()
+    if session_id:
+        online = get_callboss_nomac_online()
+        online.pop(session_id, None)
+        save_callboss_nomac_online(online)
     return jsonify({'success': True}), 200
 
 @app.route('/callboss-logout', methods=['POST'])
@@ -1381,6 +1500,12 @@ def kick_callboss_account(username):
     online = get_callboss_online()
     online.pop(username, None)
     save_callboss_online(online)
+    nomac_online = {
+        sid: info
+        for sid, info in get_callboss_nomac_online().items()
+        if info.get('username') != username
+    }
+    save_callboss_nomac_online(nomac_online)
     return jsonify({'success': True})
 
 @app.route('/callboss-accounts/<username>', methods=['DELETE'])
@@ -1392,6 +1517,12 @@ def delete_callboss_account(username):
     online = get_callboss_online()
     online.pop(username, None)
     save_callboss_online(online)
+    nomac_online = {
+        sid: info
+        for sid, info in get_callboss_nomac_online().items()
+        if info.get('username') != username
+    }
+    save_callboss_nomac_online(nomac_online)
     return jsonify({'success': True})
 
 @app.route('/files', methods=['GET'])
