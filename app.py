@@ -1250,10 +1250,11 @@ def callboss_login():
     password = str(data.get('password', '')).strip()
     device_id = str(data.get('device_id', '')).strip()
     device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
     if not username or not password:
         return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
-    if not device_id:
-        return jsonify({'valid': False, 'error': 'missing_device_id'}), 400
+    if not device_id or not session_id:
+        return jsonify({'valid': False, 'error': 'missing_device_or_session'}), 400
     accounts = build_callboss_account_rows()
     acc = next((a for a in accounts if a.get('username') == username), None)
     if not acc:
@@ -1264,18 +1265,20 @@ def callboss_login():
         return jsonify({'valid': False, 'error': 'wrong_password'}), 403
     online = get_callboss_online()
     current = online.get(username)
-    if current and current.get('device_id') != device_id:
+    if current and current.get('session_id') != session_id:
         return jsonify({
             'valid': False,
             'error': 'already_online',
             'online_device_id': current.get('device_id', ''),
             'online_device_name': current.get('device_name', ''),
+            'online_session_id': current.get('session_id', ''),
             'last_seen': current.get('last_seen', '')
         }), 409
     online[username] = {
         'username': username,
         'device_id': device_id,
         'device_name': device_name,
+        'session_id': session_id,
         'name': acc.get('name', ''),
         'last_seen': now_vn().isoformat()
     }
@@ -1294,8 +1297,9 @@ def callboss_heartbeat():
     username = str(data.get('username', '')).strip()
     device_id = str(data.get('device_id', '')).strip()
     device_name = str(data.get('device_name', '')).strip()
-    if not username or not device_id:
-        return jsonify({'success': False, 'error': 'missing_username_or_device_id'}), 400
+    session_id = str(data.get('session_id', '')).strip()
+    if not username or not device_id or not session_id:
+        return jsonify({'success': False, 'error': 'missing_username_device_or_session'}), 400
     accounts = build_callboss_account_rows()
     acc = next((a for a in accounts if a.get('username') == username), None)
     if not acc:
@@ -1304,12 +1308,13 @@ def callboss_heartbeat():
         return jsonify({'success': False, 'error': 'inactive'}), 403
     online = get_callboss_online()
     current = online.get(username)
-    if current and current.get('device_id') != device_id:
+    if current and current.get('session_id') != session_id:
         return jsonify({'success': False, 'error': 'kicked_by_other_device'}), 409
     online[username] = {
         'username': username,
         'device_id': device_id,
         'device_name': device_name,
+        'session_id': session_id,
         'name': acc.get('name', ''),
         'last_seen': now_vn().isoformat()
     }
@@ -1321,9 +1326,14 @@ def callboss_logout():
     data = request.json or {}
     username = str(data.get('username', '')).strip()
     device_id = str(data.get('device_id', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
     online = get_callboss_online()
     current = online.get(username)
-    if current and (not device_id or current.get('device_id') == device_id):
+    if current and (
+        (session_id and current.get('session_id') == session_id)
+        or (not session_id and device_id and current.get('device_id') == device_id)
+        or (not session_id and not device_id)
+    ):
         online.pop(username, None)
         save_callboss_online(online)
     return jsonify({'success': True}), 200
