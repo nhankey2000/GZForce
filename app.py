@@ -9,6 +9,7 @@ BUG_LICENSES_FILE = "licensesBug.json"
 CALLBOSS_ACCOUNTS_FILE = "accountsCallBoss.json"
 CALLBOSS_ONLINE_FILE = "onlineCallBoss.json"
 CALLBOSS_NOMAC_ONLINE_FILE = "onlineCallBossNoMac.json"
+ROOM_INFO_FILE = "roomInfo.json"
 CONFIG_FILE   = "config.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
@@ -76,6 +77,20 @@ def load_callboss_accounts():
 def save_callboss_accounts(accounts):
     with open(CALLBOSS_ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
         json.dump(accounts, f, ensure_ascii=False, indent=2)
+
+def load_room_info():
+    if not os.path.exists(ROOM_INFO_FILE):
+        return {}
+    try:
+        with open(ROOM_INFO_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_room_info(data):
+    with open(ROOM_INFO_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def load_callboss_online_raw():
     if not os.path.exists(CALLBOSS_ONLINE_FILE):
@@ -439,6 +454,7 @@ HTML = """
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
       <div class="nav-tab" id="tab-btn-license-bug" onclick="switchTab('license-bug',this)">🔑 LICENSE-BUG</div>
       <div class="nav-tab" id="tab-btn-account-callboss" onclick="switchTab('account-callboss',this)">👤 ACCOUNT-CALLBOSS</div>
+      <div class="nav-tab" id="tab-btn-room-info" onclick="switchTab('room-info',this)">🏠 SỐ PHÒNG</div>
       <div class="nav-tab" id="tab-btn-files"    onclick="switchTab('files',this)">📦 FILES</div>
       <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings',this)">⚙ SETTINGS</div>
     </div>
@@ -538,6 +554,21 @@ HTML = """
       <table>
         <thead><tr><th>#</th><th>Tên</th><th>Tài Khoản</th><th>Mật Khẩu</th><th>Online</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
         <tbody id="callboss-account-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="tab-page" id="tab-room-info">
+    <div class="section-header">
+      <div class="section-title">Số Phòng Auto Đang Gửi</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:var(--sub)" id="room-info-total-count">0 máy</span>
+        <button class="btn btn-orange" style="padding:6px 16px;font-size:12px" onclick="loadRoomInfo()">⟳ Refresh</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Tự do</th><th>Kênh</th><th>Phòng</th><th>Cập Nhật</th><th>Raw OCR</th></tr></thead>
+        <tbody id="room-info-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -732,9 +763,11 @@ function initPage(){
   loadLicenses();
   loadBugLicenses();
   loadCallbossAccounts();
+  loadRoomInfo();
   try { renderPermissionPicker(); initPermissionButtons(); } catch(e) { console.error(e); }
   try { loadConfig(); } catch(e) { console.error(e); }
   setInterval(loadLicenses,30000);
+  setInterval(loadRoomInfo,30000);
 }
 function formatPermissions(l){
   const combos = l.permissions && Array.isArray(l.permissions.allowed_combos) ? l.permissions.allowed_combos : [];
@@ -748,6 +781,7 @@ function switchTab(tab, el) {
   el.classList.add('active');
   if (tab === 'license-bug') loadBugLicenses();
   if (tab === 'account-callboss') loadCallbossAccounts();
+  if (tab === 'room-info') loadRoomInfo();
   if (tab === 'files') loadFiles();
   if (tab === 'settings') loadConfig();
 }
@@ -952,6 +986,40 @@ async function kickCallbossAccount(username){
   const res=await fetch('/callboss-accounts/'+encodeURIComponent(username)+'/kick',{method:'POST'});
   if(res.ok){showToast('✓ Đã đá account CallBossNet','success');loadCallbossAccounts();}
   else showToast('❌ Lỗi đá account','error');
+}
+async function loadRoomInfo() {
+  const tbody = document.getElementById('room-info-tbody');
+  if (!tbody) return;
+  try {
+    const res = await fetch('/room-info');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    renderRoomInfoTable(data);
+  } catch(e) {
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--red);padding:40px">Lỗi tải số phòng: '+e.message+'</td></tr>';
+  }
+}
+function renderRoomInfoTable(data) {
+  const tbody = document.getElementById('room-info-tbody');
+  const total = document.getElementById('room-info-total-count');
+  if (total) total.textContent = data.length + ' máy';
+  if (!data.length) {
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có máy nào gửi số phòng</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((r,i) => {
+    const updated = (r.updated_at || '').replace('T',' ').slice(0,19);
+    return `<tr>
+      <td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td>
+      <td style="font-weight:600">${r.name || ''}</td>
+      <td><span class="mono">${r.machine_id || ''}</span></td>
+      <td><span class="mono">${r.tudo || ''}</span></td>
+      <td><span class="mono">${r.kenh || ''}</span></td>
+      <td><span class="mono" style="color:var(--orange);font-weight:700">${r.phong || ''}</span></td>
+      <td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${updated}</td>
+      <td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:11px">${r.raw_text || ''}</td>
+    </tr>`;
+  }).join('');
 }
 function openExtend(mid,daysLeft){currentExtendId=mid;document.getElementById('extend-info').textContent='Machine ID: '+mid+' · Còn '+daysLeft+' ngày';document.getElementById('modal-extend').classList.add('active');}
 function closeModal(){document.getElementById('modal-extend').classList.remove('active');currentExtendId=null;}
@@ -1184,6 +1252,34 @@ def build_license_rows():
             'online_users': users
         })
     return result
+
+def find_license_name(machine_id):
+    machine_id = str(machine_id or '').strip()
+    for lic in load_licenses():
+        if str(lic.get('machine_id', '')).strip() == machine_id:
+            return str(lic.get('name', '')).strip()
+    return ''
+
+def build_room_info_rows():
+    data = load_room_info()
+    rows = []
+    for machine_id, info in data.items():
+        if not isinstance(info, dict):
+            continue
+        name = str(info.get('name') or find_license_name(machine_id) or '').strip()
+        rows.append({
+            'machine_id': machine_id,
+            'name': name,
+            'tudo': str(info.get('tudo', '')).strip(),
+            'kenh': str(info.get('kenh', '')).strip(),
+            'phong': str(info.get('phong', '')).strip(),
+            'raw_text': str(info.get('raw_text', '')).strip(),
+            'device_id': str(info.get('device_id', '')).strip(),
+            'device_name': str(info.get('device_name', '')).strip(),
+            'updated_at': info.get('updated_at', '')
+        })
+    rows.sort(key=lambda item: item.get('updated_at', ''), reverse=True)
+    return rows
 
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
@@ -1524,6 +1620,40 @@ def delete_callboss_account(username):
     }
     save_callboss_nomac_online(nomac_online)
     return jsonify({'success': True})
+
+@app.route('/room-info', methods=['GET'])
+def list_room_info():
+    return jsonify(build_room_info_rows())
+
+@app.route('/room-info/<machine_id>', methods=['GET'])
+def get_room_info(machine_id):
+    rows = build_room_info_rows()
+    info = next((r for r in rows if r.get('machine_id') == machine_id), None)
+    if not info:
+        return jsonify({'error': 'not_found'}), 404
+    return jsonify(info)
+
+@app.route('/room-info', methods=['POST'])
+def update_room_info():
+    data = request.json or {}
+    machine_id = str(data.get('machine_id', '')).strip()
+    if not machine_id:
+        return jsonify({'error': 'missing_machine_id'}), 400
+    rooms = load_room_info()
+    name = str(data.get('name') or find_license_name(machine_id) or '').strip()
+    rooms[machine_id] = {
+        'machine_id': machine_id,
+        'name': name,
+        'tudo': str(data.get('tudo', '')).strip()[:30],
+        'kenh': str(data.get('kenh', '')).strip()[:30],
+        'phong': str(data.get('phong', '')).strip()[:30],
+        'raw_text': str(data.get('raw_text', '')).strip()[:160],
+        'device_id': str(data.get('device_id', '')).strip(),
+        'device_name': str(data.get('device_name', '')).strip(),
+        'updated_at': now_vn().isoformat()
+    }
+    save_room_info(rooms)
+    return jsonify({'success': True, **rooms[machine_id]}), 200
 
 @app.route('/files', methods=['GET'])
 def list_files():
