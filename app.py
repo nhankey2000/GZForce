@@ -1490,7 +1490,7 @@ def is_auto_account_valid(acc):
             expires_at += 'T23:59:59'
         expire = datetime.fromisoformat(expires_at)
         if expire.tzinfo is None:
-            expire = expire.replace(tzinfo=VN_TZ)
+            expire = expire.replace(tzinfo=TZ_VN)
         if expire < now_vn():
             return False, 'expired'
     except Exception:
