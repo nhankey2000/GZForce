@@ -164,11 +164,16 @@ def normalize_bug_license(item, index=0):
     }
 
 def normalize_callboss_account(item, index=0):
+    expires_at = item.get('expires_at') or '2099-12-31T23:59:59'
+    if len(str(expires_at)) == 10:
+        expires_at = str(expires_at) + 'T23:59:59'
     return {
         'id': int(item.get('id') or index + 1),
         'username': str(item.get('username', '')).strip(),
         'password': str(item.get('password', '')).strip(),
         'name': str(item.get('name', '')).strip(),
+        'permission': str(item.get('permission', '')).strip().upper(),
+        'expires_at': str(expires_at).strip(),
         'active': bool(item.get('active', True)),
         'created_at': item.get('created_at') or now_vn().isoformat()
     }
@@ -534,13 +539,17 @@ HTML = """
   <div class="tab-page" id="tab-account-callboss">
     <div class="card-box">
       <div class="section-title" style="margin-bottom:16px">Thêm Account CallBossNet</div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto auto">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto auto auto auto">
         <div class="form-group"><label class="form-label">Tên hiển thị</label>
           <input class="form-input" id="callboss-inp-name" placeholder="Thành Nhân"/></div>
         <div class="form-group"><label class="form-label">Tài khoản</label>
           <input class="form-input" id="callboss-inp-user" placeholder="admin"/></div>
         <div class="form-group"><label class="form-label">Mật khẩu</label>
           <input class="form-input" id="callboss-inp-pass" placeholder="admin"/></div>
+        <div class="form-group"><label class="form-label">Quyền</label>
+          <select class="form-input" id="callboss-inp-permission"><option value="AUTO">AUTO</option><option value="CALLBOSS">CALLBOSS</option></select></div>
+        <div class="form-group"><label class="form-label">Hết hạn</label>
+          <input class="form-input" id="callboss-inp-expires" type="date"/></div>
         <div class="form-group"><label class="form-label">Trạng thái</label>
           <select class="form-input" id="callboss-inp-active"><option value="true">Kích hoạt</option><option value="false">Tắt</option></select></div>
         <button class="btn btn-orange" onclick="addCallbossAccount()">+ THÊM</button>
@@ -552,8 +561,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Tài Khoản</th><th>Mật Khẩu</th><th>Online</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
-        <tbody id="callboss-account-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Tài Khoản</th><th>Mật Khẩu</th><th>Quyền</th><th>Hết Hạn</th><th>Online</th><th>Trạng Thái</th><th>Ngày Tạo</th><th>Hành Động</th></tr></thead>
+        <tbody id="callboss-account-tbody"><tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -942,7 +951,7 @@ function renderCallbossAccountTable(data) {
   const total = document.getElementById('callboss-total-count');
   if (total) total.textContent = data.length + ' account';
   if (!data.length) {
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có account CallBossNet nào</td></tr>';
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Chưa có account CallBossNet nào</td></tr>';
     return;
   }
   tbody.innerHTML = data.map((a,i) => {
@@ -958,16 +967,20 @@ function renderCallbossAccountTable(data) {
       : `<button class="btn btn-green" onclick="toggleCallbossAccount('${a.username}',true)">Kích Hoạt</button>`;
     const kick = (a.online || nomacCount > 0) ? `<button class="btn btn-amber" onclick="kickCallbossAccount('${a.username}')">Đá</button>` : '';
     const created = (a.created_at || '').split('T')[0] || '';
-    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${a.name || ''}</td><td><span class="mono">${a.username}</span></td><td><span class="mono">${maskPassword(a.password)}</span></td><td>${online}</td><td>${st}</td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${created}</td><td><div class="actions">${btn}${kick}<button class="btn btn-red" onclick="deleteCallbossAccount('${a.username}','${a.name || a.username}')">Xóa</button></div></td></tr>`;
+    const permission = a.permission || '';
+    const expires = (a.expires_at || '').split('T')[0] || '';
+    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${a.name || ''}</td><td><span class="mono">${a.username}</span></td><td><span class="mono">${maskPassword(a.password)}</span></td><td><span class="status status-online">${permission}</span></td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${expires}</td><td>${online}</td><td>${st}</td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${created}</td><td><div class="actions">${btn}${kick}<button class="btn btn-red" onclick="deleteCallbossAccount('${a.username}','${a.name || a.username}')">Xóa</button></div></td></tr>`;
   }).join('');
 }
 async function addCallbossAccount() {
   const name=document.getElementById('callboss-inp-name').value.trim();
   const username=document.getElementById('callboss-inp-user').value.trim();
   const password=document.getElementById('callboss-inp-pass').value.trim();
+  const permission=document.getElementById('callboss-inp-permission').value;
+  const expires_at=document.getElementById('callboss-inp-expires').value;
   const active=document.getElementById('callboss-inp-active').value === 'true';
   if(!username||!password){showToast('Điền tài khoản và mật khẩu CallBossNet!','error');return;}
-  const res=await fetch('/callboss-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,username,password,active})});
+  const res=await fetch('/callboss-accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,username,password,permission,expires_at,active})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã thêm CallBossNet: '+username,'success');document.getElementById('callboss-inp-name').value='';document.getElementById('callboss-inp-user').value='';document.getElementById('callboss-inp-pass').value='';loadCallbossAccounts();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
@@ -1390,13 +1403,8 @@ def callboss_login():
     data = request.json or {}
     username = str(data.get('username', '')).strip()
     password = str(data.get('password', '')).strip()
-    device_id = str(data.get('device_id', '')).strip()
-    device_name = str(data.get('device_name', '')).strip()
-    session_id = str(data.get('session_id', '')).strip()
     if not username or not password:
         return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
-    if not device_id or not session_id:
-        return jsonify({'valid': False, 'error': 'missing_device_or_session'}), 400
     accounts = build_callboss_account_rows()
     acc = next((a for a in accounts if a.get('username') == username), None)
     if not acc:
@@ -1470,6 +1478,94 @@ def callboss_login_nomac():
         'active': True,
         'no_limit': True
     }), 200
+
+def is_auto_account_valid(acc):
+    if not bool(acc.get('active', True)):
+        return False, 'inactive'
+    if str(acc.get('permission', '')).strip().upper() != 'AUTO':
+        return False, 'missing_auto_permission'
+    try:
+        expires_at = str(acc.get('expires_at', '')).strip()
+        if len(expires_at) == 10:
+            expires_at += 'T23:59:59'
+        expire = datetime.fromisoformat(expires_at)
+        if expire.tzinfo is None:
+            expire = expire.replace(tzinfo=VN_TZ)
+        if expire < now_vn():
+            return False, 'expired'
+    except Exception:
+        return False, 'invalid_expire'
+    return True, ''
+
+@app.route('/tndragon-net-login', methods=['POST'])
+def tndragon_net_login():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    password = str(data.get('password', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
+    if not username or not password:
+        return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
+    if not device_id or not session_id:
+        return jsonify({'valid': False, 'error': 'missing_device_or_session'}), 400
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'valid': False, 'error': 'not_found'}), 404
+    if acc.get('password') != password:
+        return jsonify({'valid': False, 'error': 'wrong_password'}), 403
+    ok, err = is_auto_account_valid(acc)
+    if not ok:
+        return jsonify({'valid': False, 'error': err}), 403
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
+    online = get_callboss_online()
+    online[username] = {
+        'username': username,
+        'device_id': device_id,
+        'device_name': device_name,
+        'session_id': session_id,
+        'name': acc.get('name', ''),
+        'app': 'TNDragonNET',
+        'last_seen': now_vn().isoformat()
+    }
+    save_callboss_online(online)
+    return jsonify({
+        'valid': True,
+        'name': acc.get('name', ''),
+        'username': username,
+        'permission': acc.get('permission', ''),
+        'expires_at': acc.get('expires_at', ''),
+        'active': True
+    }), 200
+
+@app.route('/tndragon-net-heartbeat', methods=['POST'])
+def tndragon_net_heartbeat():
+    data = request.json or {}
+    username = str(data.get('username', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
+    accounts = build_callboss_account_rows()
+    acc = next((a for a in accounts if a.get('username') == username), None)
+    if not acc:
+        return jsonify({'success': False, 'error': 'not_found'}), 404
+    ok, err = is_auto_account_valid(acc)
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 403
+    online = get_callboss_online()
+    current = online.get(username) or {'username': username}
+    current['device_id'] = device_id
+    current['device_name'] = device_name
+    current['session_id'] = session_id
+    current['name'] = acc.get('name', '')
+    current['last_seen'] = now_vn().isoformat()
+    current['app'] = 'TNDragonNET'
+    online[username] = current
+    save_callboss_online(online)
+    return jsonify({'success': True}), 200
 
 @app.route('/callboss-heartbeat', methods=['POST'])
 def callboss_heartbeat():
@@ -1566,6 +1662,10 @@ def add_callboss_account():
     username = str(data.get('username', '')).strip()
     password = str(data.get('password', '')).strip()
     name = str(data.get('name', '')).strip()
+    permission = str(data.get('permission', '')).strip().upper()
+    expires_at = str(data.get('expires_at') or '2099-12-31').strip()
+    if len(expires_at) == 10:
+        expires_at += 'T23:59:59'
     if not username or not password:
         return jsonify({'error': 'Thiếu tài khoản hoặc mật khẩu'}), 400
     accounts = build_callboss_account_rows()
@@ -1576,6 +1676,8 @@ def add_callboss_account():
         'name': name,
         'username': username,
         'password': password,
+        'permission': permission,
+        'expires_at': expires_at,
         'active': bool(data.get('active', True)),
         'created_at': now_vn().isoformat()
     }
