@@ -567,8 +567,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Tự do</th><th>Kênh</th><th>Phòng</th><th>Mật Khẩu</th><th>Trạng Thái</th><th>Cập Nhật</th></tr></thead>
-        <tbody id="room-info-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Chế Độ</th><th>Tự do</th><th>Kênh</th><th>Phòng</th><th>Mật Khẩu</th><th>Trạng Thái</th><th>Cập Nhật</th></tr></thead>
+        <tbody id="room-info-tbody"><tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -996,7 +996,7 @@ async function loadRoomInfo() {
     const data = await res.json();
     renderRoomInfoTable(data);
   } catch(e) {
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--red);padding:40px">Lỗi tải số phòng: '+e.message+'</td></tr>';
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--red);padding:40px">Lỗi tải số phòng: '+e.message+'</td></tr>';
   }
 }
 function renderRoomInfoTable(data) {
@@ -1004,7 +1004,7 @@ function renderRoomInfoTable(data) {
   const total = document.getElementById('room-info-total-count');
   if (total) total.textContent = data.length + ' máy';
   if (!data.length) {
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Chưa có máy nào gửi số phòng</td></tr>';
+    tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Chưa có máy nào gửi số phòng</td></tr>';
     return;
   }
   tbody.innerHTML = data.map((r,i) => {
@@ -1013,6 +1013,7 @@ function renderRoomInfoTable(data) {
       <td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td>
       <td style="font-weight:600">${r.name || ''}</td>
       <td><span class="mono">${r.machine_id || ''}</span></td>
+      <td><span class="mono">${r.mode || ''}</span></td>
       <td><span class="mono">${r.tudo || ''}</span></td>
       <td><span class="mono">${r.kenh || ''}</span></td>
       <td><span class="mono" style="color:var(--orange);font-weight:700">${r.phong || ''}</span></td>
@@ -1270,6 +1271,7 @@ def build_room_info_rows():
         rows.append({
             'machine_id': machine_id,
             'name': str(info.get('name') or find_license_name(machine_id) or '').strip(),
+            'mode': str(info.get('mode', '')).strip(),
             'tudo': str(info.get('tudo', '')).strip(),
             'kenh': str(info.get('kenh', '')).strip(),
             'phong': str(info.get('phong', '')).strip(),
@@ -1644,6 +1646,7 @@ def update_room_info():
     rooms[machine_id] = {
         'machine_id': machine_id,
         'name': str(data.get('name') or current.get('name') or find_license_name(machine_id) or '').strip(),
+        'mode': str(data.get('mode', current.get('mode', ''))).strip()[:40],
         'tudo': str(data.get('tudo', current.get('tudo', ''))).strip()[:10],
         'kenh': str(data.get('kenh', current.get('kenh', ''))).strip()[:10],
         'phong': str(data.get('phong', current.get('phong', ''))).strip()[:10],
