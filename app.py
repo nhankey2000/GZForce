@@ -1485,7 +1485,7 @@ def is_auto_account_valid(acc):
     if str(acc.get('permission', '')).strip().upper() != 'AUTO':
         return False, 'missing_auto_permission'
     try:
-        expires_at = str(acc.get('expires_at', '')).strip()
+        expires_at = str(acc.get('expires_at') or '2099-12-31T23:59:59').strip()
         if len(expires_at) == 10:
             expires_at += 'T23:59:59'
         expire = datetime.fromisoformat(expires_at)
