@@ -1403,8 +1403,13 @@ def callboss_login():
     data = request.json or {}
     username = str(data.get('username', '')).strip()
     password = str(data.get('password', '')).strip()
+    device_id = str(data.get('device_id', '')).strip()
+    device_name = str(data.get('device_name', '')).strip()
+    session_id = str(data.get('session_id', '')).strip()
     if not username or not password:
         return jsonify({'valid': False, 'error': 'missing_username_or_password'}), 400
+    if not device_id or not session_id:
+        return jsonify({'valid': False, 'error': 'missing_device_or_session'}), 400
     accounts = build_callboss_account_rows()
     acc = next((a for a in accounts if a.get('username') == username), None)
     if not acc:
