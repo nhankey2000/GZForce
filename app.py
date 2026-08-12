@@ -1635,6 +1635,14 @@ def get_room_info(machine_id):
         return jsonify({'error': 'not_found'}), 404
     return jsonify(info)
 
+@app.route('/room-info/<machine_id>', methods=['DELETE'])
+def delete_room_info(machine_id):
+    machine_id = str(machine_id or '').strip()
+    rooms = load_room_info()
+    rooms.pop(machine_id, None)
+    save_room_info(rooms)
+    return jsonify({'success': True}), 200
+
 @app.route('/room-info', methods=['POST'])
 def update_room_info():
     data = request.json or {}
