@@ -7,12 +7,11 @@
     "active": true,
     "created_at": "2026-01-01T00:00:00"
   },{
-  "id": 2,
-  "username": "Mgbuompitt1",
-  "password": "0907991623",
-  "name": "Văn Thế",
-  "active": true,
-  "permission": "AUTO",
-  "expires_at": "2027-12-31T23:59:59"
-}
+    "id": 2,
+    "username": "mgbuompitt1",
+    "password": "0907991623",
+    "name": "Văn Thế",
+    "active": true,
+    "created_at": "2026-01-01T00:00:00"
+  }
 ]
