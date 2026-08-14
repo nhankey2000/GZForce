@@ -26,6 +26,15 @@
         {
           "mode": "Miệng Núi Lửa 2",
           "option": "Không chọn"
+        },
+        {
+          "mode": "Chạy Theo",
+          "option": "Không chọn"
+        }
+        ,
+        {
+          "mode": "Farm Thẻ",
+          "option": "RZ2 Lùm Tre Mid"
         }
       ]
     }
