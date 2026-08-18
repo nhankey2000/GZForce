@@ -7,38 +7,16 @@
     "expires_at": "2026-08-28T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Gọi Boss",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Bắn Boss",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Treo Zombie",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Treo GP",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Miệng Núi Lửa 2",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "Chạy Theo",
-          "option": "Không chọn"
-        },
-        {
-          "mode": "FarmThẻ",
-          "option": "RZ2 Lùm Tre Mid"
-        }
+        { "mode": "Gọi Boss", "option": "Không chọn" },
+        { "mode": "Bắn Boss", "option": "Không chọn" },
+        { "mode": "Treo Zombie", "option": "Không chọn" },
+        { "mode": "Treo GP", "option": "Không chọn" },
+        { "mode": "Miệng Núi Lửa 2", "option": "Không chọn" },
+        { "mode": "Chạy Theo", "option": "Không chọn" },
+        { "mode": "FarmThẻ", "option": "RZ2 Lùm Tre Mid" }
       ]
     }
   },
-   
   {
     "id": 2,
     "name": "Phạm Hân",
@@ -47,298 +25,295 @@
     "expires_at": "2026-08-25T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
-    {
-    "id": 22,
+  {
+    "id": 3,
     "name": "LAPTOP",
     "machine_id": "TNDRAGON-238714E509830A0E",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2029-08-25T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 3,
+    "id": 4,
     "name": "Máy 9",
     "machine_id": "TNDRAGON-81B7E237E5E18A2B",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 4,
+    "id": 5,
     "name": "Máy Phụ",
     "machine_id": "TNDRAGON-9B5799D26195D6D7",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 5,
+    "id": 6,
     "name": "Dương SOS",
     "machine_id": "TNDRAGON-68467A9002D729B7",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 6,
+    "id": 7,
     "name": "Máy CTY",
     "machine_id": "TNDRAGON-35D676C406FD3C98",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 18,
+    "id": 8,
     "name": "Hoàng Đông",
     "machine_id": "TNDRAGON-6A231A274E4163F7",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 19,
+    "id": 9,
     "name": "Tuấn Anh",
     "machine_id": "TNDRAGON-0C8C4D19C780C85F",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2026-09-28T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 17,
+    "id": 10,
     "name": "Minh Thu",
     "machine_id": "TNDRAGON-041BBB59BD65301F",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
-  }
-  ,
+  },
   {
-    "id": 22,
+    "id": 11,
     "name": "Minh Thu",
     "machine_id": "TNDRAGON-D6614E36721249BE",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2027-07-14T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
-  }
- ,
+  },
   {
-    "id": 23,
-    "name": "Thế Anh  ",
+    "id": 12,
+    "name": "Thế Anh",
     "machine_id": "TNDRAGON-A755DA724D213DD2",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2027-07-14T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 24,
-    "name": "Thế Anh  ",
+    "id": 13,
+    "name": "Thế Anh",
     "machine_id": "TNDRAGON-A1B8B603444F1FFE",
     "created_at": "2026-06-25T00:00:00",
     "expires_at": "2027-07-14T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 17,
+    "id": 14,
     "name": "Dương SOS Máy Phụ",
     "machine_id": "TNDRAGON-10EC0EE98942C261",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
-  
   {
-    "id": 22,
+    "id": 15,
     "name": "Thế Anh",
     "machine_id": "TNDRAGON-ACC434A8582879D5",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 23,
+    "id": 16,
     "name": "Q Toàn",
     "machine_id": "TNDRAGON-DEEAD524D9A16612",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2027-06-22T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 24,
+    "id": 17,
     "name": "Abn",
     "machine_id": "TNDRAGON-CEE6A259F77DFB5F",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2026-09-10T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 25,
+    "id": 18,
     "name": "Tính Xe Cỏ",
     "machine_id": "TNDRAGON-7AFEE1323D14EC65",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2026-09-12T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 26,
+    "id": 19,
     "name": "Đoàn Khuyến Máy 9",
     "machine_id": "TNDRAGON-4F8BAABE8B4CBB22",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2026-09-15T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 27,
+    "id": 20,
     "name": "Đoàn Khuyến Máy Ảo",
     "machine_id": "TNDRAGON-9F978FB66B8465BC",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2026-09-15T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   },
   {
-    "id": 28,
+    "id": 21,
     "name": "Trung",
     "machine_id": "TNDRAGON-046B9AEB09D78982",
     "created_at": "2026-06-08T00:00:00",
     "expires_at": "2026-09-15T00:00:00",
     "permissions": {
       "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
+  },
+  {
+    "id": 22,
+    "name": "Minh Thu 1",
+    "machine_id": "TNDRAGON-D3321A534EC36E3B",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2027-06-14T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
+  },
+  {
+    "id": 23,
+    "name": "Minh Thu 2",
+    "machine_id": "TNDRAGON-34FD1EFCC0E845FC",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2027-06-14T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
+  },
+  {
+    "id": 24,
+    "name": "Minh Thu 3",
+    "machine_id": "TNDRAGON-C5B22953B0E3490F",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2027-06-14T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
+  },
+  {
+    "id": 25,
+    "name": "Minh Thu 4",
+    "machine_id": "TNDRAGON-C73FE97912C6E56D",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2027-06-14T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
+  },
+  {
+    "id": 26,
+    "name": "Minh Thu 5",
+    "machine_id": "TNDRAGON-41C2A8D26F3638E4",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2027-06-14T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
   }
