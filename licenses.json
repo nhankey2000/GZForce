@@ -344,5 +344,18 @@
         { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
+  },
+  
+  {
+    "id": 29,
+    "name": "Thi",
+    "machine_id": "TNDRAGON-7CFD94D0ED14C159",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2026-09-25T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
   }
 ]
