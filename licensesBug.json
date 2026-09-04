@@ -47,40 +47,5 @@
     "machine_id": "TNDRAGON-4F8BAABE8B4CBB22",
     "active": true,
     "created_at": "2026-01-01T00:00:00"
-  },
-  {
-    "id": 8,
-    "name": "Minh Thu 1",
-    "machine_id": "TNDRAGON-D3321A534EC36E3B",
-    "active": true,
-    "created_at": "2026-08-18T00:00:00"
-  },
-  {
-    "id": 9,
-    "name": "Minh Thu 2",
-    "machine_id": "TNDRAGON-34FD1EFCC0E845FC",
-    "active": true,
-    "created_at": "2026-08-18T00:00:00"
-  },
-  {
-    "id": 10,
-    "name": "Minh Thu 3",
-    "machine_id": "TNDRAGON-C5B22953B0E3490F",
-    "active": true,
-    "created_at": "2026-08-18T00:00:00"
-  },
-  {
-    "id": 11,
-    "name": "Minh Thu 4",
-    "machine_id": "TNDRAGON-C73FE97912C6E56D",
-    "active": true,
-    "created_at": "2026-08-18T00:00:00"
-  },
-  {
-    "id": 12,
-    "name": "Minh Thu 5",
-    "machine_id": "TNDRAGON-41C2A8D26F3638E4",
-    "active": true,
-    "created_at": "2026-08-18T00:00:00"
   }
 ]
