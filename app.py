@@ -11,6 +11,7 @@ CALLBOSS_ONLINE_FILE = "onlineCallBoss.json"
 CALLBOSS_NOMAC_ONLINE_FILE = "onlineCallBossNoMac.json"
 ROOM_INFO_FILE = "roomInfo.json"
 CONFIG_FILE   = "config.json"
+PHIENBAN_FILE = "phienban.json"
 ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
@@ -187,6 +188,35 @@ def load_config():
 def save_config(cfg):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+def load_version_config():
+    if not os.path.exists(PHIENBAN_FILE):
+        return {'version': '1.1', 'updated_at': now_vn().isoformat()}
+    try:
+        with open(PHIENBAN_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return {
+                'version': str(data.get('version') or '1.0').strip(),
+                'updated_at': data.get('updated_at') or ''
+            }
+    except Exception:
+        pass
+    return {'version': '1.1', 'updated_at': ''}
+
+def save_version_config(version):
+    data = {'version': str(version).strip(), 'updated_at': now_vn().isoformat()}
+    with open(PHIENBAN_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return data
+
+def parse_version(version):
+    """So sánh 1.3 với 1.10 theo từng số, không so sánh chuỗi."""
+    try:
+        parts = [int(part) for part in str(version).strip().split('.')]
+        return tuple(parts or [0])
+    except (TypeError, ValueError):
+        return None
 
 def load_online():
     if not os.path.exists(ONLINE_FILE):
@@ -630,8 +660,16 @@ HTML = """
         </div>
         <div class="setting-item">
           <div class="section-title" style="margin-bottom:8px">ℹ Thông Tin</div>
+          <div class="section-title" style="margin:18px 0 8px">📦 Phiên Bản</div>
+          <div class="setting-desc">Phiên bản mới nhất mà client Plus sẽ đối chiếu khi mở app.</div>
+          <div class="form-group">
+            <label class="form-label">Phiên bản hiện tại</label>
+            <input class="form-input" id="inp-version" placeholder="1.1" />
+          </div>
+          <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveVersion()">💾 LƯU PHIÊN BẢN</button>
           <div class="setting-desc" style="line-height:2">
             Lưu trong <code style="color:var(--orange)">config.json</code>.<br>
+            Phiên bản lưu trong <code style="color:var(--orange)">phienban.json</code>.<br>
             Hiệu lực ngay, không cần restart.<br>
             Múi giờ: <code style="color:var(--green)">UTC+7 (Việt Nam)</code>.
           </div>
@@ -639,6 +677,9 @@ HTML = """
             <div style="font-size:11px;color:var(--sub);margin-bottom:8px;letter-spacing:1px">TRẠNG THÁI</div>
             <div style="font-family:'Roboto Mono',monospace;font-size:14px">
               Tên phòng: <span id="current-room-display" style="color:var(--cyan)">...</span>
+            </div>
+            <div style="font-family:'Roboto Mono',monospace;font-size:14px;margin-top:6px">
+              Phiên bản: <span id="current-version-display" style="color:var(--cyan)">...</span>
             </div>
           </div>
         </div>
@@ -799,13 +840,24 @@ document.getElementById('inp-expire').value = d.toISOString().split('T')[0];
 async function loadConfig() {
   const res = await fetch('/config');
   const cfg = await res.json();
+  const versionRes = await fetch('/version');
+  const versionCfg = await versionRes.json();
   const room = cfg.room_name || '';
+  const version = versionCfg.version || '1.0';
   document.getElementById('inp-room-name').value = room;
+  document.getElementById('inp-version').value = version;
   document.getElementById('preview-room').textContent = room || '(chưa đặt)';
   document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
+  document.getElementById('current-version-display').textContent = version;
   const hdr = document.getElementById('header-room');
   if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
   else hdr.style.display = 'none';
+}
+async function saveVersion() {
+  const version = document.getElementById('inp-version').value.trim();
+  const res = await fetch('/version', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version}) });
+  if (res.ok) { showToast('✓ Đã lưu phiên bản', 'success'); loadConfig(); }
+  else { const data = await res.json(); showToast('❌ ' + (data.error || 'Lỗi lưu phiên bản'), 'error'); }
 }
 async function saveRoomName() {
   const room = document.getElementById('inp-room-name').value.trim();
@@ -1093,6 +1145,28 @@ def set_config():
     cfg['room_name'] = data.get('room_name', '')
     save_config(cfg)
     return jsonify({'success': True, 'room_name': cfg['room_name']})
+
+@app.route('/version', methods=['GET'])
+def get_version():
+    server = load_version_config()
+    client_version = (request.args.get('client_version') or '').strip()
+    client_parsed = parse_version(client_version) if client_version else None
+    server_parsed = parse_version(server['version'])
+    return jsonify({
+        'version': server['version'],
+        'updated_at': server['updated_at'],
+        'client_version': client_version,
+        'update_available': bool(client_parsed and server_parsed and client_parsed < server_parsed)
+    })
+
+@app.route('/version', methods=['POST'])
+def set_version():
+    data = request.json or {}
+    version = str(data.get('version') or '').strip()
+    if not version or parse_version(version) is None:
+        return jsonify({'error': 'version không hợp lệ, ví dụ 1.1 hoặc 2.0.3'}), 400
+    saved = save_version_config(version)
+    return jsonify({'success': True, **saved})
 
 @app.route('/')
 def home():
