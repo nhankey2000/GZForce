@@ -191,18 +191,18 @@ def save_config(cfg):
 
 def load_version_config():
     if not os.path.exists(PHIENBAN_FILE):
-        return {'version': '1.1', 'updated_at': now_vn().isoformat()}
+        return {'version': '', 'updated_at': ''}
     try:
         with open(PHIENBAN_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
         if isinstance(data, dict):
             return {
-                'version': str(data.get('version') or '1.0').strip(),
+                'version': str(data.get('version') or '').strip(),
                 'updated_at': data.get('updated_at') or ''
             }
     except Exception:
         pass
-    return {'version': '1.1', 'updated_at': ''}
+    return {'version': '', 'updated_at': ''}
 
 def save_version_config(version):
     data = {'version': str(version).strip(), 'updated_at': now_vn().isoformat()}
@@ -843,12 +843,12 @@ async function loadConfig() {
   const versionRes = await fetch('/version');
   const versionCfg = await versionRes.json();
   const room = cfg.room_name || '';
-  const version = versionCfg.version || '1.0';
+  const version = versionCfg.version || '';
   document.getElementById('inp-room-name').value = room;
   document.getElementById('inp-version').value = version;
   document.getElementById('preview-room').textContent = room || '(chưa đặt)';
   document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
-  document.getElementById('current-version-display').textContent = version;
+  document.getElementById('current-version-display').textContent = version || '(chưa đặt)';
   const hdr = document.getElementById('header-room');
   if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
   else hdr.style.display = 'none';
