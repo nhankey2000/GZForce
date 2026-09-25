@@ -297,7 +297,7 @@
     "name": "Thi",
     "machine_id": "TNDRAGON-999CCE7516D1A990",
     "created_at": "2026-08-18T00:00:00",
-    "expires_at": "2026-09-25T00:00:00",
+    "expires_at": "2026-10-25T00:00:00",
     "permissions": {
       "allowed_combos": [
         { "mode": "Tất cả", "option": "Tất cả" }
