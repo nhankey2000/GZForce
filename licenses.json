@@ -456,7 +456,9 @@
     "expires_at": "2030-11-04T00:00:00",
     "permissions": {
       "allowed_combos": [
-        { "mode": "Farm Thẻ", "option": "RZ2 Thần Chết" }
+        { "mode": "Farm Thẻ", "option": "RZ2 Thần Chết" },
+        { "mode": "Gọi Boss", "option": "Không chọn" },
+        { "mode": "Bắn Boss", "option": "Không chọn" } 
       ]
     }
   }
