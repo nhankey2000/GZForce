@@ -462,5 +462,17 @@
         { "mode": "Tất cả", "option": "Tất cả" }
       ]
     }
+  }, 
+  {
+    "id": 44,
+    "name": "Huy Võ",
+    "machine_id": "TNDRAGON-FEE3D38F4195269D",
+    "created_at": "2026-08-18T00:00:00",
+    "expires_at": "2026-11-10T00:00:00",
+    "permissions": {
+      "allowed_combos": [
+        { "mode": "Tất cả", "option": "Tất cả" }
+      ]
+    }
   }
 ]
