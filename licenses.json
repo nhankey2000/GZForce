@@ -185,7 +185,7 @@
     "name": " Thanh Tính Bạc Liêu",
     "machine_id": "TNDRAGON-7AFEE1323D14EC65",
     "created_at": "2026-06-08T00:00:00",
-    "expires_at": "2026-10-12T00:00:00",
+    "expires_at": "2026-11-12T00:00:00",
     "permissions": {
       "allowed_combos": [
         { "mode": "Tất cả", "option": "Tất cả" }
@@ -381,7 +381,7 @@
     "name": "Ngọc Đức ",
     "machine_id": "TNDRAGON-E7596FA98B6C6894",
     "created_at": "2026-08-18T00:00:00",
-    "expires_at": "2026-10-13T00:00:00",
+    "expires_at": "2026-11-13T00:00:00",
     "permissions": {
       "allowed_combos": [
         { "mode": "Tất cả", "option": "Tất cả" }
@@ -436,21 +436,7 @@
       ]
     }
   }, 
-  
-  {
-    "id": 42,
-    "name": "Lương Lợi",
-    "machine_id": "TNDRAGON-3CD3BC0DF8A9D577",
-    "created_at": "2026-08-18T00:00:00",
-    "expires_at": "2030-11-04T00:00:00",
-    "permissions": {
-      "allowed_combos": [
-        { "mode": "Farm Thẻ", "option": "RZ2 Thần Chết" },
-        { "mode": "Gọi Boss", "option": "Không chọn" },
-        { "mode": "Bắn Boss", "option": "Không chọn" } 
-      ]
-    }
-  }, 
+   
   {
     "id": 43,
     "name": "Đào Việt",
