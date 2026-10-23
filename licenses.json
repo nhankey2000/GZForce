@@ -9,9 +9,11 @@
       "allowed_combos": [
         {
           "mode": "Gọi Boss",
-          "option": "Không",
+          "option": "Không chọn"
+        },
+        {
           "mode": "Bắn Boss",
-          "option": "Không"
+          "option": "Không chọn"
         }
       ],
       "allow_change_card": true
