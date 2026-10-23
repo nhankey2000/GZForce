@@ -301,7 +301,10 @@ def normalize_permissions(raw):
             if mode and option and key not in seen:
                 clean.append({'mode': mode, 'option': option})
                 seen.add(key)
-    return {'allowed_combos': clean}
+    return {
+        'allow_change_card': bool(raw.get('allow_change_card', False)),
+        'allowed_combos': clean,
+    }
 
 @app.route("/backgroup.jpg")
 def login_background():
@@ -522,6 +525,9 @@ HTML = """
       </div>
       <div class="perm-box">
         <div class="perm-note">Phân quyền thử cho Gọi Boss / Xả Thẻ theo đúng cặp chế độ + tùy chọn. Không thêm quyền nào = không khóa quyền.</div>
+        <label style="display:inline-flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--text);font-size:13px">
+          <input type="checkbox" id="allow-change-card"/> Cho phép Đổi Thẻ
+        </label>
         <div class="perm-row">
           <div class="form-group"><label class="form-label">Chế Độ</label><select class="form-input" id="perm-mode"><option>Tất cả</option><option>Gọi Boss</option><option>Bắn Boss</option><option>Treo Zombie</option><option>Treo GP</option><option>Farm Thẻ</option><option>Xả Thẻ</option><option>Treo 20 Phút</option><option>Treo 60 Phút</option><option>Chạy Theo</option></select></div>
           <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="perm-option"><option>Tất cả</option><option>Không chọn</option><option>RZ2 Thần Chết</option><option>RZ2 Lùm Tre Mid</option><option>RZ2 Nước</option><option>RZ4 Glacial Beast</option><option>RZ4 Gấu</option><option>RZ3 Gấu</option></select></div>
@@ -705,6 +711,9 @@ HTML = """
   <div class="modal" style="width:720px">
     <div class="modal-title">🔐 SỬA QUYỀN</div>
     <div style="font-size:12px;color:var(--sub);margin-bottom:12px" id="perm-edit-info"></div>
+    <label style="display:inline-flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--text);font-size:13px">
+      <input type="checkbox" id="edit-allow-change-card"/> Cho phép Đổi Thẻ
+    </label>
     <div class="perm-row" style="grid-template-columns:1fr 1fr 1.6fr auto auto">
       <div class="form-group"><label class="form-label">Chế Độ</label><select class="form-input" id="edit-perm-mode"></select></div>
       <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="edit-perm-option"></select></div>
@@ -785,6 +794,7 @@ function openPermissions(mid, name, encodedPerms){
   let perms = {allowed_combos: []};
   try { perms = JSON.parse(decodeURIComponent(encodedPerms || '')); } catch(e) {}
   editPermissionCombos = Array.isArray(perms.allowed_combos) ? perms.allowed_combos.slice() : [];
+  document.getElementById('edit-allow-change-card').checked = perms.allow_change_card === true;
   fillPermissionSelects('edit-perm-mode','edit-perm-option');
   renderEditPermissionCombos();
   document.getElementById('perm-edit-info').textContent = 'Machine ID: '+mid+' · '+name;
@@ -793,7 +803,8 @@ function openPermissions(mid, name, encodedPerms){
 function closePermissionsModal(){document.getElementById('modal-permissions').classList.remove('active');currentPermissionId=null;}
 async function savePermissions(){
   if(!currentPermissionId)return;
-  const res=await fetch('/licenses/'+currentPermissionId+'/permissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({permissions:{allowed_combos:editPermissionCombos}})});
+  const allowChangeCard=document.getElementById('edit-allow-change-card').checked;
+  const res=await fetch('/licenses/'+currentPermissionId+'/permissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({permissions:{allow_change_card:allowChangeCard,allowed_combos:editPermissionCombos}})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã lưu quyền','success');closePermissionsModal();loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi lưu quyền'),'error');
@@ -920,7 +931,8 @@ async function addLicense() {
   const name=document.getElementById('inp-name').value.trim(), mid=document.getElementById('inp-mid').value.trim(), expire=document.getElementById('inp-expire').value;
   if(!name||!mid||!expire){showToast('Điền đầy đủ thông tin!','error');return;}
   const allowed_combos=collectAllowedCombos();
-  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,expires_at:expire,permissions:{allowed_combos}})});
+  const allow_change_card=document.getElementById('allow-change-card').checked;
+  const res=await fetch('/licenses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,machine_id:mid,expires_at:expire,permissions:{allow_change_card,allowed_combos}})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã thêm: '+name,'success');document.getElementById('inp-name').value='';document.getElementById('inp-mid').value='';clearAllowedCombos();loadLicenses();}
   else showToast('❌ '+(data.error||'Lỗi'),'error');
