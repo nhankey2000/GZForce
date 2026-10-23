@@ -16,7 +16,7 @@
           "option": "Không chọn"
         }
       ],
-      "allow_change_card": true
+      "allow_change_card": false
     }
   },
   {
