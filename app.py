@@ -191,21 +191,26 @@ def save_config(cfg):
 
 def load_version_config():
     if not os.path.exists(PHIENBAN_FILE):
-        return {'version': '', 'updated_at': ''}
+        return {'version': '', 'updated_at': '', 'release_notes': ''}
     try:
         with open(PHIENBAN_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
         if isinstance(data, dict):
             return {
                 'version': str(data.get('version') or '').strip(),
-                'updated_at': data.get('updated_at') or ''
+                'updated_at': data.get('updated_at') or '',
+                'release_notes': str(data.get('release_notes') or '').strip(),
             }
     except Exception:
         pass
-    return {'version': '', 'updated_at': ''}
+    return {'version': '', 'updated_at': '', 'release_notes': ''}
 
-def save_version_config(version):
-    data = {'version': str(version).strip(), 'updated_at': now_vn().isoformat()}
+def save_version_config(version, release_notes=''):
+    data = {
+        'version': str(version).strip(),
+        'updated_at': now_vn().isoformat(),
+        'release_notes': str(release_notes or '').strip(),
+    }
     with open(PHIENBAN_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     return data
@@ -672,6 +677,10 @@ HTML = """
             <label class="form-label">Phiên bản hiện tại</label>
             <input class="form-input" id="inp-version" placeholder="1.1" />
           </div>
+          <div class="form-group" style="margin-top:12px">
+            <label class="form-label">Nội dung bản cập nhật</label>
+            <textarea class="form-input" id="inp-release-notes" rows="4" placeholder="Ví dụ: Thêm Gargoyle, sửa lỗi di chuyển..." style="resize:vertical"></textarea>
+          </div>
           <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveVersion()">💾 LƯU PHIÊN BẢN</button>
           <div class="setting-desc" style="line-height:2">
             Lưu trong <code style="color:var(--orange)">config.json</code>.<br>
@@ -855,8 +864,10 @@ async function loadConfig() {
   const versionCfg = await versionRes.json();
   const room = cfg.room_name || '';
   const version = versionCfg.version || '';
+  const releaseNotes = versionCfg.release_notes || '';
   document.getElementById('inp-room-name').value = room;
   document.getElementById('inp-version').value = version;
+  document.getElementById('inp-release-notes').value = releaseNotes;
   document.getElementById('preview-room').textContent = room || '(chưa đặt)';
   document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
   document.getElementById('current-version-display').textContent = version || '(chưa đặt)';
@@ -866,7 +877,8 @@ async function loadConfig() {
 }
 async function saveVersion() {
   const version = document.getElementById('inp-version').value.trim();
-  const res = await fetch('/version', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version}) });
+  const release_notes = document.getElementById('inp-release-notes').value.trim();
+  const res = await fetch('/version', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version, release_notes}) });
   if (res.ok) { showToast('✓ Đã lưu phiên bản', 'success'); loadConfig(); }
   else { const data = await res.json(); showToast('❌ ' + (data.error || 'Lỗi lưu phiên bản'), 'error'); }
 }
@@ -1167,6 +1179,7 @@ def get_version():
     return jsonify({
         'version': server['version'],
         'updated_at': server['updated_at'],
+        'release_notes': server.get('release_notes', ''),
         'client_version': client_version,
         'update_available': bool(client_parsed and server_parsed and client_parsed < server_parsed)
     })
@@ -1175,9 +1188,10 @@ def get_version():
 def set_version():
     data = request.json or {}
     version = str(data.get('version') or '').strip()
+    release_notes = str(data.get('release_notes') or '').strip()
     if not version or parse_version(version) is None:
         return jsonify({'error': 'version không hợp lệ, ví dụ 1.1 hoặc 2.0.3'}), 400
-    saved = save_version_config(version)
+    saved = save_version_config(version, release_notes)
     return jsonify({'success': True, **saved})
 
 @app.route('/')
