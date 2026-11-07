@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
 from datetime import datetime, timedelta, timezone
 from werkzeug.utils import secure_filename
-import json, os
+import json, os, re, secrets
+from urllib.parse import quote
 
 app = Flask(__name__)
 LICENSES_FILE = "licenses.json"
@@ -16,8 +17,44 @@ ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
 ONLINE_TIMEOUT_SECONDS = 180
+PAYMENT_ORDERS_FILE = "payment_orders.json"
+SEPAY_BANK_CODE = os.getenv("SEPAY_BANK_CODE", "").strip()
+SEPAY_ACCOUNT_NO = os.getenv("SEPAY_ACCOUNT_NO", "").strip()
+SEPAY_ACCOUNT_NAME = os.getenv("SEPAY_ACCOUNT_NAME", "").strip()
+SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
+SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
+SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def load_payment_orders():
+    if not os.path.exists(PAYMENT_ORDERS_FILE):
+        return []
+    try:
+        with open(PAYMENT_ORDERS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (OSError, ValueError):
+        return []
+
+def save_payment_orders(orders):
+    tmp = PAYMENT_ORDERS_FILE + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(orders, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, PAYMENT_ORDERS_FILE)
+
+def payment_webhook_authorized():
+    if not SEPAY_WEBHOOK_API_KEY:
+        return False
+    auth = request.headers.get('Authorization', '')
+    return auth == 'Apikey ' + SEPAY_WEBHOOK_API_KEY
+
+def build_payment_qr(amount, content):
+    return SEPAY_QR_TEMPLATE.format(
+        account=quote(SEPAY_ACCOUNT_NO),
+        bank=quote(SEPAY_BANK_CODE),
+        amount=int(amount),
+        content=quote(content),
+    )
 # ── Timezone UTC+7 ────────────────────────────────────────────────────────────
 TZ_VN = timezone(timedelta(hours=7))
 
@@ -1397,6 +1434,76 @@ def build_room_info_rows():
     rows.sort(key=lambda item: item.get('updated_at', ''), reverse=True)
     return rows
 
+@app.route('/payment/create', methods=['POST'])
+def create_payment_order():
+    data = request.get_json(silent=True) or {}
+    machine_id = str(data.get('machine_id') or '').strip()
+    try:
+        days = int(data.get('days', 0))
+    except (TypeError, ValueError):
+        days = 0
+    if not machine_id or days not in SEPAY_PACKAGES:
+        return jsonify({'error': 'machine_id hoặc gói gia hạn không hợp lệ'}), 400
+    if not SEPAY_BANK_CODE or not SEPAY_ACCOUNT_NO:
+        return jsonify({'error': 'Server chưa cấu hình tài khoản SePay'}), 503
+    licenses = load_licenses()
+    if not any(str(x.get('machine_id', '')).strip() == machine_id for x in licenses):
+        return jsonify({'error': 'Không tìm thấy license'}), 404
+    amount = SEPAY_PACKAGES[days]
+    order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
+    content = 'TNDRAGON-' + re.sub(r'[^A-Za-z0-9]', '', machine_id)[-24:]
+    order = {
+        'order_id': order_id, 'machine_id': machine_id, 'days': days,
+        'amount': amount, 'transfer_content': content,
+        'status': 'pending', 'created_at': now_vn().isoformat(),
+        'transaction_id': None,
+    }
+    orders = load_payment_orders()
+    orders.append(order)
+    save_payment_orders(orders)
+    return jsonify({**order, 'qr_url': build_payment_qr(amount, content)})
+
+@app.route('/payment/<order_id>', methods=['GET'])
+def payment_status(order_id):
+    order = next((x for x in load_payment_orders() if x.get('order_id') == order_id), None)
+    if not order:
+        return jsonify({'error': 'Không tìm thấy đơn'}), 404
+    return jsonify(order)
+
+@app.route('/payment/sepay-webhook', methods=['POST'])
+def sepay_webhook():
+    if not payment_webhook_authorized():
+        return jsonify({'error': 'unauthorized'}), 401
+    payload = request.get_json(silent=True) or request.form.to_dict()
+    if str(payload.get('transferType', 'IN')).upper() not in ('IN', 'CREDIT'):
+        return jsonify({'ignored': True}), 201
+    try:
+        amount = int(float(payload.get('transferAmount') or payload.get('amount') or 0))
+    except (TypeError, ValueError):
+        amount = 0
+    content = str(payload.get('content') or payload.get('description') or '').upper()
+    transaction_id = str(payload.get('id') or payload.get('transactionId') or '').strip()
+    if not transaction_id or amount <= 0:
+        return jsonify({'error': 'payload giao dịch không hợp lệ'}), 400
+    orders = load_payment_orders()
+    order = next((x for x in orders if x.get('status') == 'pending' and x.get('transfer_content', '').upper() in content and int(x.get('amount', 0)) == amount), None)
+    if not order:
+        return jsonify({'matched': False}), 201
+    if any(x.get('transaction_id') == transaction_id for x in orders):
+        return jsonify({'matched': True, 'duplicate': True}), 201
+    licenses = load_licenses()
+    license_item = next((x for x in licenses if str(x.get('machine_id', '')).strip() == order['machine_id']), None)
+    if not license_item:
+        return jsonify({'error': 'license không tồn tại'}), 404
+    current = parse_date(str(license_item.get('expires_at') or now_vn().isoformat()))
+    base = current if current > now_vn() else now_vn()
+    license_item['expires_at'] = (base + timedelta(days=int(order['days']))).strftime('%Y-%m-%dT23:59:59')
+    save_licenses(licenses)
+    order['status'] = 'paid'
+    order['transaction_id'] = transaction_id
+    order['paid_at'] = now_vn().isoformat()
+    save_payment_orders(orders)
+    return jsonify({'matched': True, 'status': 'paid', 'machine_id': order['machine_id'], 'new_expire': license_item['expires_at']}), 201
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
     return jsonify(build_license_rows())
