@@ -434,16 +434,5 @@
       ],
       "allow_change_card": true
     }
-  },
-  {
-    "id": 28,
-    "name": "a",
-    "machine_id": "aaa",
-    "expires_at": "2026-12-08T23:59:59",
-    "created_at": "2026-11-08T09:43:00.321234+07:00",
-    "permissions": {
-      "allow_change_card": false,
-      "allowed_combos": []
-    }
   }
 ]
