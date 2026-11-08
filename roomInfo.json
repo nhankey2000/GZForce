@@ -1,1 +1,15 @@
-﻿{}
+{
+  "TNDRAGON-238714E509830A0E": {
+    "machine_id": "TNDRAGON-238714E509830A0E",
+    "name": "LAPTOP",
+    "mode": "Farm Thẻ",
+    "tudo": "3",
+    "kenh": "4",
+    "phong": "37",
+    "password": "121",
+    "status": "Đã vào game",
+    "device_id": "ADMIN-PC-FCB681E127C9",
+    "device_name": "DESKTOP-JUNOVSI",
+    "updated_at": "2026-11-08T09:28:56.785700+07:00"
+  }
+}
