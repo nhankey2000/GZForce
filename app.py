@@ -22,8 +22,10 @@ SEPAY_BANK_CODE = os.getenv("SEPAY_BANK_CODE", "").strip()
 SEPAY_ACCOUNT_NO = os.getenv("SEPAY_ACCOUNT_NO", "").strip()
 SEPAY_ACCOUNT_NAME = os.getenv("SEPAY_ACCOUNT_NAME", "").strip()
 SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -140,6 +142,33 @@ def build_payment_qr(amount, content):
         amount=int(amount),
         content=quote(content),
     )
+
+def notify_telegram_payment(order, transaction_id):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    paid_at = order.get('paid_at') or now_vn().isoformat()
+    amount = int(order.get('amount', 0))
+    message = (
+        "✅ THANH TOÁN TNDRAGON\n"
+        f"Tên người dùng: {order.get('name', '')}\n"
+        f"Machine ID: {order.get('machine_id', '')}\n"
+        f"Gói: {order.get('days', 0)} ngày\n"
+        f"Số tiền: {amount:,} VND\n"
+        f"Mã đơn: {order.get('order_id', '')}\n"
+        f"Mã giao dịch: {transaction_id}\n"
+        f"Nội dung: {order.get('transfer_content', '')}\n"
+        f"Thời gian: {paid_at}"
+    )
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": message},
+            timeout=8,
+        )
+        if not response.ok:
+            app.logger.warning("Telegram payment notification failed: %s", response.text[:300])
+    except Exception as exc:
+        app.logger.warning("Telegram payment notification error: %s", exc)
 # ── Timezone UTC+7 ────────────────────────────────────────────────────────────
 TZ_VN = timezone(timedelta(hours=7))
 
@@ -154,6 +183,12 @@ def parse_date(iso_str):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=TZ_VN)
     return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+def parse_datetime(iso_str):
+    dt = datetime.fromisoformat(iso_str)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=TZ_VN)
+    return dt
 
 def load_licenses():
     if github_enabled():
@@ -1642,7 +1677,7 @@ def payment_status(order_id):
         return jsonify({'error': 'Không tìm thấy đơn'}), 404
     if order.get('status') == 'pending':
         try:
-            if parse_date(str(order.get('expires_at', ''))) <= now_vn():
+            if parse_datetime(str(order.get('expires_at', ''))) <= now_vn():
                 orders = [x for x in orders if x.get('order_id') != order_id]
                 save_payment_orders(orders)
                 return jsonify({'error': 'Đơn thanh toán đã hết hạn', 'status': 'expired'}), 410
@@ -1671,7 +1706,7 @@ def sepay_webhook():
         (
             x for x in orders
             if x.get('status') == 'pending'
-            and parse_date(str(x.get('expires_at', '9999-12-31T23:59:59+07:00'))) > now_vn()
+            and parse_datetime(str(x.get('expires_at', '9999-12-31T23:59:59+07:00'))) > now_vn()
             and re.sub(r'[^A-Z0-9]', '', str(x.get('transfer_content', '')).upper()) in normalized_content
             and int(x.get('amount', 0)) == amount
         ),
@@ -1705,6 +1740,7 @@ def sepay_webhook():
     order['transaction_id'] = transaction_id
     order['paid_at'] = now_vn().isoformat()
     save_payment_orders(orders)
+    notify_telegram_payment(order, transaction_id)
     return jsonify({'matched': True, 'status': 'paid', 'machine_id': order['machine_id'], 'new_expire': license_item['expires_at']}), 201
 @app.route('/payment-orders', methods=['GET'])
 def list_payment_orders():
@@ -1714,7 +1750,7 @@ def list_payment_orders():
     for order in orders:
         if order.get('status') == 'pending':
             try:
-                expires = parse_date(str(order.get('expires_at', '')))
+                expires = parse_datetime(str(order.get('expires_at', '')))
                 if expires <= now_vn():
                     continue
             except Exception:
