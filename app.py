@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
 from datetime import datetime, timedelta, timezone
 from werkzeug.utils import secure_filename
-import json, os, re, secrets
+import json, os, re, secrets, base64, requests
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -24,21 +24,96 @@ SEPAY_ACCOUNT_NAME = os.getenv("SEPAY_ACCOUNT_NAME", "").strip()
 SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
 SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
+GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
+GITHUB_LICENSES_PATH = os.getenv("GITHUB_LICENSES_PATH", "licenses.json").strip()
+GITHUB_ORDERS_PATH = os.getenv("GITHUB_ORDERS_PATH", "payment_orders.json").strip()
+GITHUB_DATA_PATHS = {
+    "licenses.json": GITHUB_LICENSES_PATH,
+    "payment_orders.json": GITHUB_ORDERS_PATH,
+    "licensesBug.json": os.getenv("GITHUB_BUG_LICENSES_PATH", "licensesBug.json").strip(),
+    "accountsCallBoss.json": os.getenv("GITHUB_CALLBOSS_PATH", "accountsCallBoss.json").strip(),
+    "roomInfo.json": os.getenv("GITHUB_ROOM_INFO_PATH", "roomInfo.json").strip(),
+    "config.json": os.getenv("GITHUB_CONFIG_PATH", "config.json").strip(),
+    "phienban.json": os.getenv("GITHUB_VERSION_PATH", "phienban.json").strip(),
+}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def github_enabled():
+    return bool(GITHUB_TOKEN and GITHUB_REPO)
+
+def github_headers():
+    return {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+def github_read_json(path, fallback):
+    if not github_enabled():
+        return fallback
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
+    response = requests.get(url, headers=github_headers(), params={"ref": GITHUB_BRANCH}, timeout=12)
+    if response.status_code == 404:
+        return fallback
+    response.raise_for_status()
+    encoded = response.json().get("content", "")
+    return json.loads(base64.b64decode(encoded).decode("utf-8"))
+
+def github_write_json(path, value, message):
+    if not github_enabled():
+        return False
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
+    current = requests.get(url, headers=github_headers(), params={"ref": GITHUB_BRANCH}, timeout=12)
+    sha = current.json().get("sha") if current.status_code == 200 else None
+    content = base64.b64encode(json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
+    body = {"message": message, "content": content, "branch": GITHUB_BRANCH}
+    if sha:
+        body["sha"] = sha
+    response = requests.put(url, headers=github_headers(), json=body, timeout=15)
+    response.raise_for_status()
+    return True
+
+def github_data_path(local_path):
+    return GITHUB_DATA_PATHS.get(local_path, local_path)
+
+def persistent_json_read(local_path, fallback):
+    if github_enabled():
+        try:
+            return github_read_json(github_data_path(local_path), fallback)
+        except Exception as exc:
+            app.logger.error("GitHub %s read failed: %s", local_path, exc)
+    return fallback
+
+def persistent_json_write(local_path, value, message):
+    if github_enabled():
+        github_write_json(github_data_path(local_path), value, message)
+        return True
+    return False
+
 def load_payment_orders():
+    if github_enabled():
+        try:
+            data = github_read_json(GITHUB_ORDERS_PATH, [])
+            return data if isinstance(data, list) else []
+        except Exception as exc:
+            app.logger.error("GitHub payment_orders read failed: %s", exc)
     if not os.path.exists(PAYMENT_ORDERS_FILE):
         return []
     try:
-        with open(PAYMENT_ORDERS_FILE, 'r', encoding='utf-8') as f:
+        with open(PAYMENT_ORDERS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, list) else []
     except (OSError, ValueError):
         return []
 
 def save_payment_orders(orders):
-    tmp = PAYMENT_ORDERS_FILE + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
+    if github_enabled():
+        github_write_json(GITHUB_ORDERS_PATH, orders, "Update payment orders")
+        return
+    tmp = PAYMENT_ORDERS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(orders, f, ensure_ascii=False, indent=2)
     os.replace(tmp, PAYMENT_ORDERS_FILE)
 
@@ -71,16 +146,32 @@ def parse_date(iso_str):
     return dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
 def load_licenses():
+    if github_enabled():
+        try:
+            data = github_read_json(GITHUB_LICENSES_PATH, [])
+            return data if isinstance(data, list) else []
+        except Exception as exc:
+            app.logger.error("GitHub licenses read failed: %s", exc)
     if not os.path.exists(LICENSES_FILE):
         return []
     with open(LICENSES_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def save_licenses(licenses):
+    if github_enabled():
+        github_write_json(GITHUB_LICENSES_PATH, licenses, "Update licenses")
+        return
     with open(LICENSES_FILE, 'w', encoding='utf-8') as f:
         json.dump(licenses, f, ensure_ascii=False, indent=2)
 
 def load_bug_licenses():
+    if github_enabled():
+        data = persistent_json_read(BUG_LICENSES_FILE, [])
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return [data]
+        return []
     if not os.path.exists(BUG_LICENSES_FILE):
         return []
     try:
@@ -95,10 +186,19 @@ def load_bug_licenses():
         return []
 
 def save_bug_licenses(licenses):
+    if persistent_json_write(BUG_LICENSES_FILE, licenses, "Update bug licenses"):
+        return
     with open(BUG_LICENSES_FILE, 'w', encoding='utf-8') as f:
         json.dump(licenses, f, ensure_ascii=False, indent=2)
 
 def load_callboss_accounts():
+    if github_enabled():
+        data = persistent_json_read(CALLBOSS_ACCOUNTS_FILE, [])
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            return [data]
+        return []
     if not os.path.exists(CALLBOSS_ACCOUNTS_FILE):
         return []
     try:
@@ -113,10 +213,15 @@ def load_callboss_accounts():
         return []
 
 def save_callboss_accounts(accounts):
+    if persistent_json_write(CALLBOSS_ACCOUNTS_FILE, accounts, "Update Call Boss accounts"):
+        return
     with open(CALLBOSS_ACCOUNTS_FILE, 'w', encoding='utf-8') as f:
         json.dump(accounts, f, ensure_ascii=False, indent=2)
 
 def load_room_info():
+    if github_enabled():
+        data = persistent_json_read(ROOM_INFO_FILE, {})
+        return data if isinstance(data, dict) else {}
     if not os.path.exists(ROOM_INFO_FILE):
         return {}
     try:
@@ -127,6 +232,8 @@ def load_room_info():
         return {}
 
 def save_room_info(data):
+    if persistent_json_write(ROOM_INFO_FILE, data, "Update room information"):
+        return
     with open(ROOM_INFO_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -217,16 +324,30 @@ def normalize_callboss_account(item, index=0):
     }
 
 def load_config():
+    if github_enabled():
+        data = persistent_json_read(CONFIG_FILE, {'room_name': ''})
+        return data if isinstance(data, dict) else {'room_name': ''}
     if not os.path.exists(CONFIG_FILE):
         return {'room_name': ''}
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def save_config(cfg):
+    if persistent_json_write(CONFIG_FILE, cfg, "Update app config"):
+        return
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
 def load_version_config():
+    if github_enabled():
+        data = persistent_json_read(PHIENBAN_FILE, {})
+        if isinstance(data, dict):
+            return {
+                'version': str(data.get('version') or '').strip(),
+                'updated_at': data.get('updated_at') or '',
+                'release_notes': str(data.get('release_notes') or '').strip(),
+            }
+        return {'version': '', 'updated_at': '', 'release_notes': ''}
     if not os.path.exists(PHIENBAN_FILE):
         return {'version': '', 'updated_at': '', 'release_notes': ''}
     try:
@@ -248,8 +369,9 @@ def save_version_config(version, release_notes=''):
         'updated_at': now_vn().isoformat(),
         'release_notes': str(release_notes or '').strip(),
     }
-    with open(PHIENBAN_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    if not persistent_json_write(PHIENBAN_FILE, data, "Update version metadata"):
+        with open(PHIENBAN_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
     return data
 
 def parse_version(version):
@@ -532,6 +654,7 @@ HTML = """
     <div id="header-room" class="logo-room" style="display:none"></div>
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
+      <div class="nav-tab" id="tab-btn-payments" onclick="switchTab('payments',this)">💳 PAYMENTS</div>
       <div class="nav-tab" id="tab-btn-license-bug" onclick="switchTab('license-bug',this)">🔑 LICENSE-BUG</div>
       <div class="nav-tab" id="tab-btn-account-callboss" onclick="switchTab('account-callboss',this)">👤 ACCOUNT-CALLBOSS</div>
       <div class="nav-tab" id="tab-btn-room-info" onclick="switchTab('room-info',this)">🏠 SỐ PHÒNG</div>
@@ -587,6 +710,18 @@ HTML = """
       <table>
         <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Online</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
         <tbody id="license-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="tab-page" id="tab-payments">
+    <div class="section-header">
+      <div class="section-title">Lịch Sử Giao Dịch</div>
+      <span style="font-size:12px;color:var(--sub)" id="payment-total-count">0 giao dịch</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Mã đơn</th><th>Machine ID</th><th>Số tiền</th><th>Số ngày</th><th>Nội dung</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thanh toán lúc</th></tr></thead>
+        <tbody id="payment-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -881,12 +1016,26 @@ function formatPermissions(l){
   if(!combos.length)return '<span style="color:var(--sub);font-size:12px">Không khóa</span>';
   return '<div class="perm-badges">'+combos.map(c=>`<span class="perm-badge">${c.mode === 'Tất cả' && c.option === 'Tất cả' ? 'Tất cả' : (c.option === 'Không chọn' ? c.mode : c.mode+' · '+c.option)}</span>`).join('')+'</div>';
 }
+async function loadPayments(){
+  const tbody=document.getElementById("payment-tbody");
+  try {
+    const res=await fetch("/payment-orders");
+    const data=await res.json();
+    document.getElementById("payment-total-count").textContent=data.length+" giao dịch";
+    if(!data.length){tbody.innerHTML="<tr><td colspan=\"8\" style=\"text-align:center;color:var(--sub);padding:40px\">Chưa có giao dịch</td></tr>";return;}
+    tbody.innerHTML=data.slice().reverse().map(o=>{
+      const status=o.status==="paid" ? "<span class=\"status status-active\">Đã thanh toán</span>" : "<span class=\"status status-warn\">Đang chờ</span>";
+      return `<tr><td class="mono">${o.order_id||""}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${o.created_at||""}</td><td>${o.paid_at||"-"}</td></tr>`;
+    }).join("");
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
+}
 function switchTab(tab, el) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   if (tab === 'license-bug') loadBugLicenses();
+  if (tab === 'payments') loadPayments();
   if (tab === 'account-callboss') loadCallbossAccounts();
   if (tab === 'room-info') loadRoomInfo();
   if (tab === 'files') loadFiles();
@@ -1504,6 +1653,10 @@ def sepay_webhook():
     order['paid_at'] = now_vn().isoformat()
     save_payment_orders(orders)
     return jsonify({'matched': True, 'status': 'paid', 'machine_id': order['machine_id'], 'new_expire': license_item['expires_at']}), 201
+@app.route('/payment-orders', methods=['GET'])
+def list_payment_orders():
+    return jsonify(load_payment_orders())
+
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
     return jsonify(build_license_rows())
