@@ -37,5 +37,18 @@
     "device_id": "PC-8E5298734B2D",
     "device_name": "PC",
     "updated_at": "2026-11-08T09:29:07.801805+07:00"
+  },
+  "TNDRAGON-FD75D38EED99859C": {
+    "machine_id": "TNDRAGON-FD75D38EED99859C",
+    "name": "Trần Minh Bảo",
+    "mode": "Farm Thẻ",
+    "tudo": "3",
+    "kenh": "6",
+    "phong": "49",
+    "password": "gfgg",
+    "status": "Đã vào game",
+    "device_id": "DESKTOP-J63DIBR-E5DEA4ED595A",
+    "device_name": "DESKTOP-J63DIBR",
+    "updated_at": "2026-11-08T09:29:13.596186+07:00"
   }
 }
