@@ -503,6 +503,7 @@ HTML = """
   .header{background:rgba(26,26,36,.78);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.12);padding:0 32px;
     display:flex;align-items:center;justify-content:space-between;height:64px;
     position:sticky;top:0;z-index:100;}
+  .header>div:first-child{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;}
   .header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
     background:linear-gradient(90deg,var(--orange),var(--cyan));}
   .logo{font-family:'Roboto Mono',monospace;font-size:20px;color:var(--orange);letter-spacing:2px;}
@@ -510,13 +511,13 @@ HTML = """
   .logo-room{font-family:'Roboto Mono',monospace;font-size:12px;color:var(--cyan);
     margin-left:12px;padding:3px 10px;border:1px solid rgba(0,229,255,.3);
     border-radius:4px;background:rgba(0,229,255,.06);}
-  .nav-tabs{display:flex;gap:4px;margin-left:24px;}
+  .nav-tabs{display:flex;gap:4px;margin-left:24px;flex-shrink:0;}
   .nav-tab{padding:8px 20px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;
     letter-spacing:1px;border:1px solid transparent;transition:all .2s;color:var(--sub);}
   .nav-tab.active{background:var(--orange);color:#000;border-color:var(--orange);}
   .nav-tab:not(.active):hover{border-color:var(--border);color:var(--text);}
-  .header-right{display:flex;gap:10px;align-items:center;}
-  .badge{font-family:'Roboto Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid;}
+  .header-right{display:flex;gap:10px;align-items:center;flex-shrink:0;white-space:nowrap;}
+  .badge{font-family:'Roboto Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid;white-space:nowrap;display:inline-flex;align-items:center;}
   .badge-green{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);}
   .badge-red{color:var(--red);border-color:var(--red);background:rgba(255,61,61,.08);}
   .badge-amber{color:var(--amber);border-color:var(--amber);background:rgba(255,171,0,.08);}
@@ -726,8 +727,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Mã đơn</th><th>Machine ID</th><th>Số tiền</th><th>Số ngày</th><th>Nội dung</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thanh toán lúc</th></tr></thead>
-        <tbody id="payment-tbody"><tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>Mã đơn</th><th>Machine ID</th><th>Số tiền</th><th>Số ngày</th><th>Nội dung</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thanh toán lúc</th><th>Hành động</th></tr></thead>
+        <tbody id="payment-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1028,12 +1029,18 @@ async function loadPayments(){
     const res=await fetch("/payment-orders");
     const data=await res.json();
     document.getElementById("payment-total-count").textContent=data.length+" giao dịch";
-    if(!data.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
+    if(!data.length){tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
     tbody.innerHTML=data.slice().reverse().map(o=>{
       const status=o.status==="paid" ? `<span class="status status-active">Đã thanh toán</span>` : `<span class="status status-warn">Đang chờ</span>`;
-      return `<tr><td class="mono">${o.order_id||""}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${o.created_at||""}</td><td>${o.paid_at||"-"}</td></tr>`;
+      return `<tr><td class="mono">${o.order_id||""}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${o.created_at||""}</td><td>${o.paid_at||"-"}</td><td><button class="btn btn-red" onclick="deletePaymentOrder('${o.order_id||""}')">Xóa</button></td></tr>`;
     }).join("");
-  } catch(e) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
+}
+async function deletePaymentOrder(orderId){
+  if(!orderId || !confirm('Xóa giao dịch này?')) return;
+  const res=await fetch('/payment-orders/'+encodeURIComponent(orderId),{method:'DELETE'});
+  if(res.ok){showToast('✓ Đã xóa giao dịch','success');loadPayments();}
+  else showToast('Không xóa được giao dịch','error');
 }
 function switchTab(tab, el) {
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
@@ -1609,6 +1616,7 @@ def create_payment_order():
     display_name = str((license_item or {}).get('name') or requested_name).strip()
     amount = SEPAY_PACKAGES[days]
     order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
+    expires_at = (now_vn() + timedelta(minutes=30)).isoformat()
     machine_token = re.sub(r'[^A-Za-z0-9]', '', machine_id).upper()
     if machine_token.startswith('TNDRAGON'):
         machine_token = machine_token[len('TNDRAGON'):]
@@ -1618,6 +1626,7 @@ def create_payment_order():
         'name': display_name,
         'amount': amount, 'transfer_content': content,
         'status': 'pending', 'created_at': now_vn().isoformat(),
+        'expires_at': expires_at,
         'transaction_id': None,
     }
     orders = load_payment_orders()
@@ -1627,9 +1636,18 @@ def create_payment_order():
 
 @app.route('/payment/<order_id>', methods=['GET'])
 def payment_status(order_id):
-    order = next((x for x in load_payment_orders() if x.get('order_id') == order_id), None)
+    orders = load_payment_orders()
+    order = next((x for x in orders if x.get('order_id') == order_id), None)
     if not order:
         return jsonify({'error': 'Không tìm thấy đơn'}), 404
+    if order.get('status') == 'pending':
+        try:
+            if parse_date(str(order.get('expires_at', ''))) <= now_vn():
+                orders = [x for x in orders if x.get('order_id') != order_id]
+                save_payment_orders(orders)
+                return jsonify({'error': 'Đơn thanh toán đã hết hạn', 'status': 'expired'}), 410
+        except Exception:
+            pass
     return jsonify(order)
 
 @app.route('/payment/sepay-webhook', methods=['POST'])
@@ -1653,6 +1671,7 @@ def sepay_webhook():
         (
             x for x in orders
             if x.get('status') == 'pending'
+            and parse_date(str(x.get('expires_at', '9999-12-31T23:59:59+07:00'))) > now_vn()
             and re.sub(r'[^A-Z0-9]', '', str(x.get('transfer_content', '')).upper()) in normalized_content
             and int(x.get('amount', 0)) == amount
         ),
@@ -1689,7 +1708,35 @@ def sepay_webhook():
     return jsonify({'matched': True, 'status': 'paid', 'machine_id': order['machine_id'], 'new_expire': license_item['expires_at']}), 201
 @app.route('/payment-orders', methods=['GET'])
 def list_payment_orders():
-    return jsonify(load_payment_orders())
+    orders = load_payment_orders()
+    cutoff = now_vn() - timedelta(hours=24)
+    kept = []
+    for order in orders:
+        if order.get('status') == 'pending':
+            try:
+                expires = parse_date(str(order.get('expires_at', '')))
+                if expires <= now_vn():
+                    continue
+            except Exception:
+                try:
+                    created = parse_date(str(order.get('created_at', '')))
+                    if created < cutoff:
+                        continue
+                except Exception:
+                    pass
+        kept.append(order)
+    if len(kept) != len(orders):
+        save_payment_orders(kept)
+    return jsonify(kept)
+
+@app.route('/payment-orders/<order_id>', methods=['DELETE'])
+def delete_payment_order(order_id):
+    orders = load_payment_orders()
+    kept = [x for x in orders if x.get('order_id') != order_id]
+    if len(kept) == len(orders):
+        return jsonify({'error': 'not_found'}), 404
+    save_payment_orders(kept)
+    return jsonify({'success': True})
 
 @app.route('/licenses', methods=['GET'])
 def list_licenses():
