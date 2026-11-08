@@ -1587,6 +1587,7 @@ def build_room_info_rows():
 def create_payment_order():
     data = request.get_json(silent=True) or {}
     machine_id = str(data.get('machine_id') or '').strip()
+    requested_name = str(data.get('name') or '').strip()
     try:
         days = int(data.get('days', 0))
     except (TypeError, ValueError):
@@ -1596,13 +1597,16 @@ def create_payment_order():
     if not SEPAY_BANK_CODE or not SEPAY_ACCOUNT_NO:
         return jsonify({'error': 'Server chưa cấu hình tài khoản SePay'}), 503
     licenses = load_licenses()
-    if not any(str(x.get('machine_id', '')).strip() == machine_id for x in licenses):
-        return jsonify({'error': 'Không tìm thấy license'}), 404
+    license_item = next((x for x in licenses if str(x.get('machine_id', '')).strip() == machine_id), None)
+    if not license_item and not requested_name:
+        return jsonify({'error': 'Người dùng mới cần nhập tên'}), 400
+    display_name = str((license_item or {}).get('name') or requested_name).strip()
     amount = SEPAY_PACKAGES[days]
     order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
     content = 'TNDRAGON-' + re.sub(r'[^A-Za-z0-9]', '', machine_id)[-24:]
     order = {
         'order_id': order_id, 'machine_id': machine_id, 'days': days,
+        'name': display_name,
         'amount': amount, 'transfer_content': content,
         'status': 'pending', 'created_at': now_vn().isoformat(),
         'transaction_id': None,
@@ -1641,9 +1645,17 @@ def sepay_webhook():
     if any(x.get('transaction_id') == transaction_id for x in orders):
         return jsonify({'matched': True, 'duplicate': True}), 201
     licenses = load_licenses()
-    license_item = next((x for x in licenses if str(x.get('machine_id', '')).strip() == order['machine_id']), None)
     if not license_item:
-        return jsonify({'error': 'license không tồn tại'}), 404
+        license_item = {
+            'id': len(licenses) + 1,
+            'name': str(order.get('name') or '').strip(),
+            'machine_id': order['machine_id'],
+            'created_at': now_vn().isoformat(),
+            'permissions': normalize_permissions({'allowed_combos': [{'mode': 'Tất cả', 'option': 'Tất cả'}]}),
+        }
+        licenses.append(license_item)
+    elif not str(license_item.get('name') or '').strip() and order.get('name'):
+        license_item['name'] = str(order['name']).strip()
     current = parse_date(str(license_item.get('expires_at') or now_vn().isoformat()))
     base = current if current > now_vn() else now_vn()
     license_item['expires_at'] = (base + timedelta(days=int(order['days']))).strftime('%Y-%m-%dT23:59:59')
