@@ -229,9 +229,7 @@ def save_callboss_accounts(accounts):
         json.dump(accounts, f, ensure_ascii=False, indent=2)
 
 def load_room_info():
-    if github_enabled():
-        data = persistent_json_read(ROOM_INFO_FILE, {})
-        return data if isinstance(data, dict) else {}
+    # roomInfo là dữ liệu trạng thái online, cập nhật liên tục; không commit GitHub.
     if not os.path.exists(ROOM_INFO_FILE):
         return {}
     try:
@@ -242,8 +240,6 @@ def load_room_info():
         return {}
 
 def save_room_info(data):
-    if persistent_json_write(ROOM_INFO_FILE, data, "Update room information"):
-        return
     with open(ROOM_INFO_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
@@ -1032,9 +1028,9 @@ async function loadPayments(){
     const res=await fetch("/payment-orders");
     const data=await res.json();
     document.getElementById("payment-total-count").textContent=data.length+" giao dịch";
-    if(!data.length){tbody.innerHTML="<tr><td colspan=\"8\" style=\"text-align:center;color:var(--sub);padding:40px\">Chưa có giao dịch</td></tr>";return;}
+    if(!data.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
     tbody.innerHTML=data.slice().reverse().map(o=>{
-      const status=o.status==="paid" ? "<span class=\"status status-active\">Đã thanh toán</span>" : "<span class=\"status status-warn\">Đang chờ</span>";
+      const status=o.status==="paid" ? `<span class="status status-active">Đã thanh toán</span>` : `<span class="status status-warn">Đang chờ</span>`;
       return `<tr><td class="mono">${o.order_id||""}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${o.created_at||""}</td><td>${o.paid_at||"-"}</td></tr>`;
     }).join("");
   } catch(e) { tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
