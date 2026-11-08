@@ -24,5 +24,18 @@
     "device_id": "DESKTOP-2TFJ704-9464B63966E3",
     "device_name": "DESKTOP-2TFJ704",
     "updated_at": "2026-11-08T09:29:05.864505+07:00"
+  },
+  "TNDRAGON-6D3BE210F88A1A84": {
+    "machine_id": "TNDRAGON-6D3BE210F88A1A84",
+    "name": "Phùng Hiển",
+    "mode": "Xả Thẻ",
+    "tudo": "3",
+    "kenh": "5",
+    "phong": "40",
+    "password": "111",
+    "status": "Đã vào game",
+    "device_id": "PC-8E5298734B2D",
+    "device_name": "PC",
+    "updated_at": "2026-11-08T09:29:07.801805+07:00"
   }
 }
