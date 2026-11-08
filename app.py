@@ -1651,6 +1651,10 @@ def sepay_webhook():
     if any(x.get('transaction_id') == transaction_id for x in orders):
         return jsonify({'matched': True, 'duplicate': True}), 201
     licenses = load_licenses()
+    license_item = next(
+        (x for x in licenses if x.get('machine_id') == order.get('machine_id')),
+        None,
+    )
     if not license_item:
         license_item = {
             'id': len(licenses) + 1,
