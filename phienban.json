@@ -1,5 +1,5 @@
 {
-  "version": "1.9",
-  "updated_at": "2026-11-08T14:41:38.370183+07:00",
+  "version": "2.0",
+  "updated_at": "2026-11-08T15:38:59.030927+07:00",
   "release_notes": "Cập nhật vị trí tâm hướng vào đầu boss cho mode Xả Thẻ tại RZ2 Thần Chết, RZ4 Glacial Beast và RZ2 Lùm Tre Mid. Thêm chức năng Farm RZ2 Khỉ Đá. Tích hợp thanh toán gia hạn tool tự động bằng QR SePay."
 }
