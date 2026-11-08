@@ -33,10 +33,10 @@
     "kenh": "5",
     "phong": "40",
     "password": "111",
-    "status": "Đang out phòng",
+    "status": "Đang tạo phòng",
     "device_id": "PC-8E5298734B2D",
     "device_name": "PC",
-    "updated_at": "2026-11-08T09:32:33.326353+07:00"
+    "updated_at": "2026-11-08T09:32:41.100293+07:00"
   },
   "TNDRAGON-FD75D38EED99859C": {
     "machine_id": "TNDRAGON-FD75D38EED99859C",
