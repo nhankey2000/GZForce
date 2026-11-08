@@ -55,17 +55,6 @@
     "transaction_id": null
   },
   {
-    "order_id": "TN-20261108100331-6B1CFE",
-    "machine_id": "TNDRAGON-81B7E237E5E18A2B",
-    "days": 30,
-    "name": "Thành Nhân",
-    "amount": 50000,
-    "transfer_content": "TNDRAGON-TNDRAGON81B7E237E5E18A2B",
-    "status": "pending",
-    "created_at": "2026-11-08T10:03:31.646914+07:00",
-    "transaction_id": null
-  },
-  {
     "order_id": "TN-20261108100834-98F0E4",
     "machine_id": "TNDRAGON-81B7E237E5E18A2B",
     "days": 30,
