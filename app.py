@@ -1609,7 +1609,10 @@ def create_payment_order():
     display_name = str((license_item or {}).get('name') or requested_name).strip()
     amount = SEPAY_PACKAGES[days]
     order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
-    content = 'TNDRAGON-' + re.sub(r'[^A-Za-z0-9]', '', machine_id)[-24:]
+    machine_token = re.sub(r'[^A-Za-z0-9]', '', machine_id).upper()
+    if machine_token.startswith('TNDRAGON'):
+        machine_token = machine_token[len('TNDRAGON'):]
+    content = 'TNDRAGON' + machine_token[-24:]
     order = {
         'order_id': order_id, 'machine_id': machine_id, 'days': days,
         'name': display_name,
