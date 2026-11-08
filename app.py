@@ -41,14 +41,20 @@ GITHUB_DATA_PATHS = {
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def github_enabled():
+    # Repo Public có thể đọc khi chưa cấu hình token; token chỉ bắt buộc khi ghi.
+    return bool(GITHUB_REPO)
+
+def github_write_enabled():
     return bool(GITHUB_TOKEN and GITHUB_REPO)
 
 def github_headers():
-    return {
+    headers = {
         "Accept": "application/vnd.github+json",
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return headers
 
 def github_read_json(path, fallback):
     if not github_enabled():
@@ -59,10 +65,11 @@ def github_read_json(path, fallback):
         return fallback
     response.raise_for_status()
     encoded = response.json().get("content", "")
-    return json.loads(base64.b64decode(encoded).decode("utf-8"))
+    # utf-8-sig đọc được cả JSON thường lẫn file có BOM do Windows/PowerShell tạo.
+    return json.loads(base64.b64decode(encoded).decode("utf-8-sig"))
 
 def github_write_json(path, value, message):
-    if not github_enabled():
+    if not github_write_enabled():
         return False
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     current = requests.get(url, headers=github_headers(), params={"ref": GITHUB_BRANCH}, timeout=12)
@@ -87,9 +94,12 @@ def persistent_json_read(local_path, fallback):
     return fallback
 
 def persistent_json_write(local_path, value, message):
-    if github_enabled():
-        github_write_json(github_data_path(local_path), value, message)
-        return True
+    if github_write_enabled():
+        try:
+            github_write_json(github_data_path(local_path), value, message)
+            return True
+        except Exception as exc:
+            app.logger.error("GitHub %s write failed: %s", local_path, exc)
     return False
 
 def load_payment_orders():
