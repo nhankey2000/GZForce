@@ -11,5 +11,18 @@
     "device_id": "ADMIN-PC-FCB681E127C9",
     "device_name": "DESKTOP-JUNOVSI",
     "updated_at": "2026-11-08T09:28:56.785700+07:00"
+  },
+  "TNDRAGON-BDA53817F3681E2C": {
+    "machine_id": "TNDRAGON-BDA53817F3681E2C",
+    "name": "Nguyễn Phương Minh",
+    "mode": "Xả Thẻ",
+    "tudo": "3",
+    "kenh": "6",
+    "phong": "71",
+    "password": "121",
+    "status": "Đã vào game",
+    "device_id": "DESKTOP-2TFJ704-9464B63966E3",
+    "device_name": "DESKTOP-2TFJ704",
+    "updated_at": "2026-11-08T09:29:05.864505+07:00"
   }
 }
