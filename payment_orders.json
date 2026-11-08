@@ -30,9 +30,10 @@
     "name": "Thành Nhân",
     "amount": 2000,
     "transfer_content": "TNDRAGON81B7E237E5E18A2B",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-08T15:13:11.882578+07:00",
     "expires_at": "2026-11-08T15:43:11.882428+07:00",
-    "transaction_id": null
+    "transaction_id": "97405515",
+    "paid_at": "2026-11-08T15:14:04.274828+07:00"
   }
 ]
