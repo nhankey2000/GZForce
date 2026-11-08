@@ -1645,7 +1645,16 @@ def sepay_webhook():
     if not transaction_id or amount <= 0:
         return jsonify({'error': 'payload giao dịch không hợp lệ'}), 400
     orders = load_payment_orders()
-    order = next((x for x in orders if x.get('status') == 'pending' and x.get('transfer_content', '').upper() in content and int(x.get('amount', 0)) == amount), None)
+    normalized_content = re.sub(r'[^A-Z0-9]', '', content)
+    order = next(
+        (
+            x for x in orders
+            if x.get('status') == 'pending'
+            and re.sub(r'[^A-Z0-9]', '', str(x.get('transfer_content', '')).upper()) in normalized_content
+            and int(x.get('amount', 0)) == amount
+        ),
+        None,
+    )
     if not order:
         return jsonify({'matched': False}), 201
     if any(x.get('transaction_id') == transaction_id for x in orders):
