@@ -445,5 +445,21 @@
       "allow_change_card": false,
       "allowed_combos": []
     }
+  },
+  {
+    "id": 29,
+    "name": "aaa",
+    "machine_id": "aaaa",
+    "expires_at": "2026-12-10T23:59:59",
+    "created_at": "2026-11-08T09:43:08.965696+07:00",
+    "permissions": {
+      "allow_change_card": false,
+      "allowed_combos": [
+        {
+          "mode": "Tất cả",
+          "option": "Tất cả"
+        }
+      ]
+    }
   }
 ]
