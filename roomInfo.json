@@ -50,5 +50,18 @@
     "device_id": "DESKTOP-J63DIBR-E5DEA4ED595A",
     "device_name": "DESKTOP-J63DIBR",
     "updated_at": "2026-11-08T09:29:13.596186+07:00"
+  },
+  "TNDRAGON-68467A9002D729B7": {
+    "machine_id": "TNDRAGON-68467A9002D729B7",
+    "name": "Dương SOS",
+    "mode": "Xả Thẻ",
+    "tudo": "3",
+    "kenh": "3",
+    "phong": "36",
+    "password": "121",
+    "status": "Đã vào game",
+    "device_id": "DESKTOP-J4R05G7-652ED0521459",
+    "device_name": "DESKTOP-J4R05G7",
+    "updated_at": "2026-11-08T09:29:25.346266+07:00"
   }
 }
