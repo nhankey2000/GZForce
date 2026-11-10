@@ -691,9 +691,8 @@ HTML = """
 </head>
 <body>
 <div class="header">
-  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">
-    <div class="logo">GZF<span>PANEL</span></div>
-    <div id="header-room" class="logo-room" style="display:none"></div>
+  <div style="display:flex;align-items:center;flex-wrap:nowrap;gap:8px">
+    <div class="logo">TNDragon Tool</div>
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
       <div class="nav-tab" id="tab-btn-payments" onclick="switchTab('payments',this)">💳 PAYMENTS</div>
@@ -1112,8 +1111,10 @@ async function loadConfig() {
   document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
   document.getElementById('current-version-display').textContent = version || '(chưa đặt)';
   const hdr = document.getElementById('header-room');
-  if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
-  else hdr.style.display = 'none';
+  if (hdr) {
+    if (room) { hdr.textContent = '🏠 ' + room; hdr.style.display = ''; }
+    else hdr.style.display = 'none';
+  }
 }
 async function saveVersion() {
   const version = document.getElementById('inp-version').value.trim();
