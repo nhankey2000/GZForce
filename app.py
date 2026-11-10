@@ -793,6 +793,7 @@ HTML = """
     <span class="badge badge-green" id="badge-active">● 0 Active</span>
     <span class="badge badge-red"   id="badge-expired">● 0 Expired</span>
     <span class="badge badge-amber" id="badge-warn">⚠ 0 Expiring</span>
+    <a class="nav-tab" href="/logout" style="text-decoration:none;color:var(--sub);white-space:nowrap">↪ ĐĂNG XUẤT</a>
   </div>
 </div>
 <div class="main">
