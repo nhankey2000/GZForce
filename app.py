@@ -274,12 +274,13 @@ def record_payment_usage(month_key=None):
     limit = int((app_cfg.get('payment_limits') or {}).get('sepay', SEPAY_FREE_LIMIT) or 0)
     reached_limit = bool(limit and int(totals[month_key]) >= limit)
     should_alert = reached_limit and not bool(alerted.get(month_key))
-    if should_alert:
-        alerted[month_key] = True
     app_cfg['payment_usage_alerted'] = alerted
     save_config(app_cfg)
     if should_alert:
-        notify_telegram_sepay_exhausted(month_key, int(totals[month_key]), limit)
+        if notify_telegram_sepay_exhausted(month_key, int(totals[month_key]), limit):
+            alerted[month_key] = True
+            app_cfg['payment_usage_alerted'] = alerted
+            save_config(app_cfg)
     return int(totals[month_key])
 
 def payment_webhook_authorized():
@@ -1983,14 +1984,15 @@ def payment_config():
         sepay = usage.get('sepay', {})
         sepay_limit = int(sepay.get('limit', 0) or 0)
         month_key = now_vn().strftime('%Y-%m')
-        if sepay_limit and int(sepay.get('remaining', 0) or 0) == 0:
-            app_cfg = load_config()
-            alerted = app_cfg.get('payment_usage_alerted') if isinstance(app_cfg.get('payment_usage_alerted'), dict) else {}
-            if not alerted.get(month_key):
+        app_cfg = load_config()
+        alerted = app_cfg.get('payment_usage_alerted') if isinstance(app_cfg.get('payment_usage_alerted'), dict) else {}
+        if sepay_limit and int(sepay.get('remaining', 0) or 0) == 0 and not alerted.get(month_key):
+            if notify_telegram_sepay_exhausted(month_key, int(sepay.get('month', 0) or 0), sepay_limit):
                 alerted[month_key] = True
-                app_cfg['payment_usage_alerted'] = alerted
-                save_config(app_cfg)
-                notify_telegram_sepay_exhausted(month_key, int(sepay.get('month', 0) or 0), sepay_limit)
+        elif not sepay_limit or int(sepay.get('remaining', 0) or 0) > 0:
+            alerted.pop(month_key, None)
+        app_cfg['payment_usage_alerted'] = alerted
+        save_config(app_cfg)
     return jsonify({**cfg, 'usage': usage, 'month': now_vn().strftime('%Y-%m')})
 
 @app.route('/payment/sepay-webhook', methods=['POST'])
