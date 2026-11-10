@@ -147,17 +147,23 @@ def notify_telegram_payment(order, transaction_id):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
     paid_at = order.get('paid_at') or now_vn().isoformat()
+    try:
+        paid_at_display = parse_datetime(str(paid_at)).astimezone(TZ_VN).strftime('%d/%m/%Y %H:%M:%S')
+    except Exception:
+        paid_at_display = str(paid_at)
     amount = int(order.get('amount', 0))
+    amount_display = f"{amount:,}".replace(',', '.')
     message = (
-        "✅ THANH TOÁN TNDRAGON\n"
-        f"Tên người dùng: {order.get('name', '')}\n"
-        f"Machine ID: {order.get('machine_id', '')}\n"
-        f"Gói: {order.get('days', 0)} ngày\n"
-        f"Số tiền: {amount:,} VND\n"
-        f"Mã đơn: {order.get('order_id', '')}\n"
-        f"Mã giao dịch: {transaction_id}\n"
-        f"Nội dung: {order.get('transfer_content', '')}\n"
-        f"Thời gian: {paid_at}"
+        "✅ THANH TOÁN THÀNH CÔNG\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 Tên người dùng: {order.get('name', '')}\n"
+        f"🖥️ Machine ID: {order.get('machine_id', '')}\n"
+        f"📦 Gói gia hạn: {order.get('days', 0)} ngày\n"
+        f"💰 Số tiền: {amount_display} VND\n"
+        f"🧾 Mã đơn: {order.get('order_id', '')}\n"
+        f"🔖 Mã giao dịch: {transaction_id}\n"
+        f"💬 Nội dung: {order.get('transfer_content', '')}\n"
+        f"🕒 Thời gian: {paid_at_display}"
     )
     try:
         response = requests.post(
@@ -465,6 +471,7 @@ def get_online_info():
                 'device_id': info.get('device_id', online_id),
                 'device_name': info.get('device_name', ''),
                 'name': info.get('name', ''),
+                'version': info.get('version', ''),
                 'last_seen': info.get('last_seen', '')
             }
             for online_id, info in sorted(online.items(), key=lambda item: item[1].get('last_seen', ''), reverse=True)
@@ -749,8 +756,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Online</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
-        <tbody id="license-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>#</th><th>Tên</th><th>Machine ID</th><th>Phiên bản</th><th>Hết Hạn</th><th>Còn Lại</th><th>Quyền</th><th>Online</th><th>Trạng Thái</th><th>Hành Động</th></tr></thead>
+        <tbody id="license-tbody"><tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1140,7 +1147,7 @@ async function loadLicenses() {
     loadOnline();
   } catch(e) {
     console.error(e);
-    if (tbody) tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--red);padding:40px">Lỗi tải license: '+e.message+'</td></tr>';
+    if (tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--red);padding:40px">Lỗi tải license: '+e.message+'</td></tr>';
   }
 }
 async function loadOnline() {
@@ -1164,7 +1171,7 @@ function updateStats(data) {
 }
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
-  if (!data.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
+    if (!data.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Chưa có license nào</td></tr>'; return; }
   tbody.innerHTML = data.map((l,i) => {
     const days=l.days_left, expireDate=l.expires_at.split('T')[0];
     let st,dh;
@@ -1173,11 +1180,12 @@ function renderLicenseTable(data) {
     else{st='<span class="status status-active">Hoạt động</span>';dh='<span style="color:var(--green);font-family:Roboto Mono,monospace">'+days+' ngày</span>';}
     const perms=formatPermissions(l);
     const onlineCount = l.online_count || 0;
+    const version = l.version || 'Chưa xác định';
     const online = onlineCount > 0
       ? `<span class="status status-online">Online · ${onlineCount} người</span>`
       : '<span class="status status-offline">Offline</span>';
     const permData=encodeURIComponent(JSON.stringify(l.permissions||{allowed_combos:[]}));
-    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${online}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
+    return `<tr><td style="color:var(--sub);font-family:Roboto Mono,monospace">${i+1}</td><td style="font-weight:600">${l.name}</td><td><span class="mono">${l.machine_id}</span></td><td><span class="mono" style="color:var(--cyan)">${version}</span></td><td style="color:var(--sub);font-family:Roboto Mono,monospace;font-size:12px">${expireDate}</td><td>${dh}</td><td>${perms}</td><td>${online}</td><td>${st}</td><td><div class="actions"><button class="btn btn-green" onclick="openExtend('${l.machine_id}',${days})">Gia Hạn</button><button class="btn btn-cyan" onclick="openPermissions('${l.machine_id}','${l.name}', '${permData}')">Sửa Quyền</button><button class="btn btn-red" onclick="deleteLicense('${l.machine_id}','${l.name}')">Xóa</button></div></td></tr>`;
   }).join('');
 }
 async function addLicense() {
@@ -1496,6 +1504,7 @@ def heartbeat():
         'device_id': device_id or online_id,
         'device_name': device_name,
         'name': lic.get('name', data.get('name', '')),
+        'version': str(data.get('version') or '').strip(),
         'last_seen': now_vn().isoformat()
     }
     save_online(online)
@@ -1600,12 +1609,17 @@ def build_license_rows():
         expire    = parse_date(l['expires_at'])
         days_left = (expire - now).days
         users = online_by_machine.get(l['machine_id'], [])
+        version = next(
+            (str(user.get('version') or '').strip() for user in users if str(user.get('version') or '').strip()),
+            '',
+        )
         result.append({
             **l,
             'days_left': days_left,
             'status': 'active' if days_left > 0 else 'expired',
             'online_count': len(users),
-            'online_users': users
+            'online_users': users,
+            'version': version
         })
     return result
 
