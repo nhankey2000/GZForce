@@ -31,7 +31,10 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
+PAYMENT_GATEWAYS = ('sepay', 'monapay')
+SEPAY_FREE_LIMIT = int(os.getenv('SEPAY_FREE_LIMIT', '50') or 50)
+MONAPAY_FREE_LIMIT = int(os.getenv('MONAPAY_FREE_LIMIT', '0') or 0)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -85,7 +88,7 @@ def require_admin_for_dashboard():
     protected = (
         path == '/' or
         path in {'/config', '/licenses', '/payment-orders', '/bug-licenses',
-                 '/callboss-accounts', '/online', '/files'} or
+                 '/callboss-accounts', '/online', '/files', '/payment-config'} or
         path.startswith('/licenses/') or
         path.startswith('/payment-orders/') or
         path.startswith('/bug-licenses/') or
@@ -206,6 +209,38 @@ def save_payment_orders(orders):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(orders, f, ensure_ascii=False, indent=2)
     os.replace(tmp, PAYMENT_ORDERS_FILE)
+
+def load_payment_config():
+    cfg = load_config()
+    gateway = str(cfg.get('payment_gateway') or 'sepay').strip().lower()
+    if gateway not in PAYMENT_GATEWAYS:
+        gateway = 'sepay'
+    limits = cfg.get('payment_limits') if isinstance(cfg.get('payment_limits'), dict) else {}
+    return {
+        'active_gateway': gateway,
+        'limits': {
+            'sepay': int(limits.get('sepay', SEPAY_FREE_LIMIT) or 0),
+            'monapay': int(limits.get('monapay', MONAPAY_FREE_LIMIT) or 0),
+        },
+    }
+
+def payment_usage():
+    orders = load_payment_orders()
+    now = now_vn()
+    month_key = now.strftime('%Y-%m')
+    result = {}
+    for gateway in PAYMENT_GATEWAYS:
+        rows = [
+            order for order in orders
+            if order.get('status') == 'paid'
+            and str(order.get('gateway') or 'sepay').lower() == gateway
+        ]
+        month_rows = [
+            order for order in rows
+            if str(order.get('paid_at') or order.get('created_at') or '').startswith(month_key)
+        ]
+        result[gateway] = {'total': len(rows), 'month': len(month_rows)}
+    return result
 
 def payment_webhook_authorized():
     if not SEPAY_WEBHOOK_API_KEY:
@@ -780,28 +815,24 @@ HTML = """
     <div class="logo">TNDragon Tool</div>
     <div class="nav-tabs">
       <div class="nav-tab active" id="tab-btn-licenses" onclick="switchTab('licenses',this)">🔑 LICENSE</div>
-      <div class="nav-tab" id="tab-btn-payments" onclick="switchTab('payments',this)">💳 PAYMENTS</div>
+      <div class="nav-tab" id="tab-btn-payments" onclick="switchTab('payments',this)">💳 QUẢN LÝ PAY</div>
       <div class="nav-tab" id="tab-btn-license-bug" onclick="switchTab('license-bug',this)">🔑 LICENSE-BUG</div>
       <div class="nav-tab" id="tab-btn-account-callboss" onclick="switchTab('account-callboss',this)">👤 ACCOUNT-CALLBOSS</div>
       <div class="nav-tab" id="tab-btn-room-info" onclick="switchTab('room-info',this)">🏠 SỐ PHÒNG</div>
-      <div class="nav-tab" id="tab-btn-files"    onclick="switchTab('files',this)">📦 FILES</div>
       <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings',this)">⚙ SETTINGS</div>
     </div>
   </div>
   <div class="header-right">
-    <span class="badge badge-green" id="badge-online">Online: 0</span>
-    <span class="badge badge-green" id="badge-active">● 0 Active</span>
-    <span class="badge badge-red"   id="badge-expired">● 0 Expired</span>
-    <span class="badge badge-amber" id="badge-warn">⚠ 0 Expiring</span>
     <a class="nav-tab" href="/logout" style="text-decoration:none;color:var(--sub);white-space:nowrap">↪ ĐĂNG XUẤT</a>
   </div>
 </div>
 <div class="main">
   <div class="tab-page active" id="tab-licenses">
-    <div class="stats">
+    <div class="stats" style="grid-template-columns:repeat(5,minmax(0,1fr))">
       <div class="stat-card s-total"><div class="stat-label">Tổng License</div><div class="stat-num" id="stat-total">0</div></div>
       <div class="stat-card s-active"><div class="stat-label">Hoạt Động</div><div class="stat-num" id="stat-active">0</div></div>
       <div class="stat-card s-expired"><div class="stat-label">Hết Hạn</div><div class="stat-num" id="stat-expired">0</div></div>
+      <div class="stat-card s-warn"><div class="stat-label">Sắp Hết Hạn</div><div class="stat-num" id="stat-warn">0</div></div>
       <div class="stat-card s-warn"><div class="stat-label">Online</div><div class="stat-num" id="stat-online">0</div></div>
     </div>
     <div class="card-box">
@@ -841,6 +872,25 @@ HTML = """
     </div>
   </div>
   <div class="tab-page" id="tab-payments">
+    <div class="stats">
+      <div class="stat-card s-total"><div class="stat-label">SePay đã dùng</div><div class="stat-num" id="pay-sepay-used">0/50</div></div>
+      <div class="stat-card s-active"><div class="stat-label">SePay còn lại</div><div class="stat-num" id="pay-sepay-left">50</div></div>
+      <div class="stat-card s-warn"><div class="stat-label">MonaPay đã dùng</div><div class="stat-num" id="pay-mona-used">0</div></div>
+      <div class="stat-card s-expired"><div class="stat-label">Cổng đang dùng</div><div class="stat-num" id="pay-active-gateway-display" style="font-size:22px">SePay</div></div>
+    </div>
+    <div class="card-box" style="margin-bottom:24px">
+      <div class="section-title" style="margin-bottom:16px">⚙ Quản Lý Cổng Thanh Toán</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto">
+        <div class="form-group"><label class="form-label">Cổng đang hoạt động</label>
+          <select class="form-input" id="pay-active-gateway"><option value="sepay">SePay</option><option value="monapay">MonaPay</option></select></div>
+        <div class="form-group"><label class="form-label">Hạn mức SePay/tháng</label>
+          <input class="form-input" id="pay-limit-sepay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
+        <div class="form-group"><label class="form-label">Hạn mức MonaPay/tháng</label>
+          <input class="form-input" id="pay-limit-monapay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
+        <button class="btn btn-orange" onclick="savePaymentConfig()">💾 LƯU PAY</button>
+      </div>
+      <div class="setting-desc" id="pay-config-status" style="margin-top:12px">Đang tải cấu hình thanh toán...</div>
+    </div>
     <div class="section-header">
       <div class="section-title">Lịch Sử Giao Dịch</div>
       <span style="font-size:12px;color:var(--sub)" id="payment-total-count">0 giao dịch</span>
@@ -1133,6 +1183,8 @@ function initPage(){
   loadBugLicenses();
   loadCallbossAccounts();
   loadRoomInfo();
+  loadPayments();
+  loadPaymentConfig();
   try { renderPermissionPicker(); initPermissionButtons(); } catch(e) { console.error(e); }
   try { loadConfig(); } catch(e) { console.error(e); }
   setInterval(loadLicenses,30000);
@@ -1162,6 +1214,32 @@ async function loadPayments(){
     }).join("");
   } catch(e) { tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
 }
+async function loadPaymentConfig(){
+  try {
+    const res=await fetch('/payment-config');
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Không tải được cấu hình Pay');
+    const active=data.active_gateway||'sepay';
+    document.getElementById('pay-active-gateway').value=active;
+    document.getElementById('pay-limit-sepay').value=data.limits?.sepay ?? 0;
+    document.getElementById('pay-limit-monapay').value=data.limits?.monapay ?? 0;
+    const sepay=data.usage?.sepay||{}, mona=data.usage?.monapay||{};
+    document.getElementById('pay-sepay-used').textContent=(sepay.limit ? sepay.month+'/'+sepay.limit : sepay.month);
+    document.getElementById('pay-sepay-left').textContent=(sepay.remaining === null ? '∞' : sepay.remaining);
+    document.getElementById('pay-mona-used').textContent=(mona.limit ? mona.month+'/'+mona.limit : mona.month);
+    document.getElementById('pay-active-gateway-display').textContent=active==='monapay'?'MonaPay':'SePay';
+    document.getElementById('pay-config-status').textContent='Đang dùng '+(active==='monapay'?'MonaPay':'SePay')+' · Số lượt tính theo tháng '+(data.month||'');
+  } catch(e) { document.getElementById('pay-config-status').textContent='Lỗi tải cấu hình Pay: '+e.message; }
+}
+async function savePaymentConfig(){
+  const active_gateway=document.getElementById('pay-active-gateway').value;
+  const limits={sepay:parseInt(document.getElementById('pay-limit-sepay').value||'0'),monapay:parseInt(document.getElementById('pay-limit-monapay').value||'0')};
+  if(limits.sepay<0||limits.monapay<0){showToast('Hạn mức không hợp lệ','error');return;}
+  const res=await fetch('/payment-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active_gateway,limits})});
+  const data=await res.json();
+  if(res.ok){showToast('✓ Đã lưu cấu hình Pay','success');loadPaymentConfig();}
+  else showToast('❌ '+(data.error||'Không lưu được Pay'),'error');
+}
 async function deletePaymentOrder(orderId){
   if(!orderId || !confirm('Xóa giao dịch này?')) return;
   const res=await fetch('/payment-orders/'+encodeURIComponent(orderId),{method:'DELETE'});
@@ -1174,10 +1252,9 @@ function switchTab(tab, el) {
   document.getElementById('tab-' + tab).classList.add('active');
   el.classList.add('active');
   if (tab === 'license-bug') loadBugLicenses();
-  if (tab === 'payments') loadPayments();
+  if (tab === 'payments') { loadPayments(); loadPaymentConfig(); }
   if (tab === 'account-callboss') loadCallbossAccounts();
   if (tab === 'room-info') loadRoomInfo();
-  if (tab === 'files') loadFiles();
   if (tab === 'settings') loadConfig();
 }
 const d = new Date(); d.setDate(d.getDate()+30);
@@ -1234,7 +1311,8 @@ async function loadOnline() {
     const res = await fetch('/online');
     const data = await res.json();
     document.getElementById('stat-online').textContent = data.count || 0;
-    document.getElementById('badge-online').textContent = 'Online: ' + (data.count || 0);
+    const badgeOnline = document.getElementById('badge-online');
+    if (badgeOnline) badgeOnline.textContent = 'Online: ' + (data.count || 0);
   } catch(e) {}
 }
 function updateStats(data) {
@@ -1244,9 +1322,13 @@ function updateStats(data) {
   document.getElementById('stat-active').textContent=active;
   document.getElementById('stat-expired').textContent=expired;
   document.getElementById('total-count').textContent=total+' license';
-  document.getElementById('badge-active').textContent='● '+active+' Active';
-  document.getElementById('badge-expired').textContent='● '+expired+' Expired';
-  document.getElementById('badge-warn').textContent='⚠ '+warn+' Expiring';
+  document.getElementById('stat-warn').textContent=warn;
+  const badgeActive=document.getElementById('badge-active');
+  const badgeExpired=document.getElementById('badge-expired');
+  const badgeWarn=document.getElementById('badge-warn');
+  if (badgeActive) badgeActive.textContent='● '+active+' Active';
+  if (badgeExpired) badgeExpired.textContent='● '+expired+' Expired';
+  if (badgeWarn) badgeWarn.textContent='⚠ '+warn+' Expiring';
 }
 function renderLicenseTable(data) {
   const tbody = document.getElementById('license-tbody');
@@ -1742,6 +1824,10 @@ def create_payment_order():
         days = 0
     if not machine_id or days not in SEPAY_PACKAGES:
         return jsonify({'error': 'machine_id hoặc gói gia hạn không hợp lệ'}), 400
+    payment_cfg = load_payment_config()
+    gateway = payment_cfg['active_gateway']
+    if gateway != 'sepay':
+        return jsonify({'error': 'MonaPay chưa được cấu hình API/QR trên server'}), 503
     if not SEPAY_BANK_CODE or not SEPAY_ACCOUNT_NO:
         return jsonify({'error': 'Server chưa cấu hình tài khoản SePay'}), 503
     licenses = load_licenses()
@@ -1759,6 +1845,7 @@ def create_payment_order():
     order = {
         'order_id': order_id, 'machine_id': machine_id, 'days': days,
         'name': display_name,
+        'gateway': gateway,
         'amount': amount, 'transfer_content': content,
         'invoice_code': invoice_code,
         'status': 'pending', 'created_at': now_vn().isoformat(),
@@ -1785,6 +1872,34 @@ def payment_status(order_id):
         except Exception:
             pass
     return jsonify(order)
+
+@app.route('/payment-config', methods=['GET', 'POST'])
+def payment_config():
+    cfg = load_payment_config()
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        gateway = str(data.get('active_gateway') or '').strip().lower()
+        if gateway not in PAYMENT_GATEWAYS:
+            return jsonify({'error': 'Cổng thanh toán không hợp lệ'}), 400
+        limits = data.get('limits') if isinstance(data.get('limits'), dict) else {}
+        normalized_limits = {}
+        for name in PAYMENT_GATEWAYS:
+            try:
+                normalized_limits[name] = max(0, int(limits.get(name, cfg['limits'][name])))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Hạn mức không hợp lệ'}), 400
+        app_cfg = load_config()
+        app_cfg['payment_gateway'] = gateway
+        app_cfg['payment_limits'] = normalized_limits
+        save_config(app_cfg)
+        cfg = {'active_gateway': gateway, 'limits': normalized_limits}
+    usage = payment_usage()
+    for name in PAYMENT_GATEWAYS:
+        limit = cfg['limits'][name]
+        used = usage[name]['month']
+        usage[name]['limit'] = limit
+        usage[name]['remaining'] = max(0, limit - used) if limit else None
+    return jsonify({**cfg, 'usage': usage, 'month': now_vn().strftime('%Y-%m')})
 
 @app.route('/payment/sepay-webhook', methods=['POST'])
 def sepay_webhook():
