@@ -839,15 +839,17 @@ HTML = """
     padding:12px 16px;font-family:'Roboto Mono',monospace;font-size:12px;color:var(--cyan);
     margin-top:12px;line-height:1.8;}
   @media(max-width:768px){
-    .header{height:auto;min-height:64px;padding:10px 12px;align-items:flex-start;gap:10px;overflow-x:auto;}
-    .header>div:first-child{min-width:max-content;gap:10px!important;}
-    .logo{font-size:16px;}
+    html,body{overflow-x:hidden;}
+    .header{height:auto;min-height:92px;padding:10px 12px 8px;display:flex;flex-wrap:wrap;align-items:flex-start;gap:0;overflow:visible;white-space:normal;}
+    .header>div:first-child{display:block!important;flex:1 1 100%;width:100%;min-width:0;}
+    .logo{font-size:16px;padding-right:118px;line-height:24px;}
     .logo span{font-size:10px;}
-    .nav-tabs{margin-left:8px;gap:6px;}
-    .nav-tab{padding:8px 12px;font-size:12px;letter-spacing:.5px;}
-    .header-right{min-width:max-content;gap:6px;}
+    .nav-tabs{display:flex;max-width:100%;margin:8px 0 0;gap:6px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;scrollbar-width:thin;}
+    .nav-tab{flex:0 0 auto;padding:8px 12px;font-size:12px;letter-spacing:.5px;}
+    .header-right{position:absolute;top:10px;right:12px;min-width:0;gap:6px;}
+    .logout-tab{padding:7px 10px;font-size:11px;}
     .badge{font-size:10px;padding:4px 8px;}
-    .main{width:100%;max-width:none;padding:18px 12px;}
+    .main{width:100%;max-width:none;padding:18px 12px;overflow:hidden;}
     .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
     .stat-card{padding:16px 14px;min-width:0;}
     .stat-label{font-size:11px;}
