@@ -1,14 +1,14 @@
 {
   "room_name": "AUTO REDZONE - ZALO: 0796 851 830",
   "payment_usage_totals": {
-    "2026-11": 14
+    "2026-11": 40
   },
   "payment_gateway": "sepay",
   "payment_limits": {
     "sepay": 50
   },
   "payment_usage_adjustment": {
-    "2026-11": 11
+    "2026-11": 37
   },
   "payment_usage_alerted": {
     "2026-11": true
