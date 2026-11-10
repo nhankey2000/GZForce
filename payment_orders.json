@@ -61,17 +61,5 @@
     "expires_at": "2026-11-08T17:50:51.742283+07:00",
     "transaction_id": "97445272",
     "paid_at": "2026-11-08T17:21:46.964351+07:00"
-  },
-  {
-    "order_id": "TN-20261110085740-DB8647",
-    "machine_id": "TNDRAGON-CB8E788E5B07D243",
-    "days": 90,
-    "name": "Máy CTY",
-    "amount": 150000,
-    "transfer_content": "TNDRAGONCB8E788E5B07D243",
-    "status": "pending",
-    "created_at": "2026-11-10T08:57:40.898424+07:00",
-    "expires_at": "2026-11-10T09:27:40.898376+07:00",
-    "transaction_id": null
   }
 ]
