@@ -106,7 +106,7 @@ ADMIN_LOGIN_HTML = r'''<!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Đăng nhập TNDragon Tool</title>
 <style>
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101522;color:#eef2ff;font-family:Arial,sans-serif}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(rgba(10,15,28,.68),rgba(10,15,28,.78)),url('/backgroup.jpg') center/cover fixed;color:#eef2ff;font-family:Arial,sans-serif}
 .box{width:min(360px,calc(100% - 40px));padding:28px;background:#182238;border:1px solid #2b4268;border-radius:12px;box-shadow:0 18px 50px #0008}
 h1{margin:0 0 8px;color:#60a5fa;font-size:22px}.sub{color:#aab7cc;font-size:13px;margin-bottom:22px}
 label{display:block;color:#dbeafe;font-size:13px;margin:12px 0 6px}input{box-sizing:border-box;width:100%;padding:11px 12px;border:1px solid #496487;border-radius:7px;background:#fff;color:#111827;font-size:14px}
@@ -610,7 +610,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GZF License Manager</title>
+<title>TNDragon Tool</title>
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
