@@ -13,20 +13,6 @@
     "paid_at": "2026-11-08T17:21:46.964351+07:00"
   },
   {
-    "order_id": "TN-20261110115300-0A4BD0",
-    "machine_id": "TNDRAGON-81B7E237E5E18A2B",
-    "days": 30,
-    "name": "Thành Nhân",
-    "amount": 2000,
-    "transfer_content": "TN-D7F573A8-A2B-30",
-    "invoice_code": "D7F573A8",
-    "status": "paid",
-    "created_at": "2026-11-10T11:53:00.239412+07:00",
-    "expires_at": "2026-11-10T12:23:00.239230+07:00",
-    "transaction_id": "98045924",
-    "paid_at": "2026-11-10T11:53:44.437462+07:00"
-  },
-  {
     "order_id": "TN-20261110124419-B2C965",
     "machine_id": "TNDRAGON-81B7E237E5E18A2B",
     "days": 30,
