@@ -1672,7 +1672,7 @@ def create_payment_order():
     display_name = str((license_item or {}).get('name') or requested_name).strip()
     amount = SEPAY_PACKAGES[days]
     order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
-    expires_at = (now_vn() + timedelta(minutes=30)).isoformat()
+    expires_at = (now_vn() + timedelta(minutes=5)).isoformat()
     machine_token = re.sub(r'[^A-Za-z0-9]', '', machine_id).upper()
     machine_suffix = machine_token[-3:]
     invoice_code = secrets.token_hex(4).upper()
