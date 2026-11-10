@@ -10,5 +10,7 @@
   "payment_usage_adjustment": {
     "2026-11": 47
   },
-  "payment_usage_alerted": {}
+  "payment_usage_alerted": {
+    "2026-11": true
+  }
 }
