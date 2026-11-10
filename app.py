@@ -31,10 +31,9 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
-PAYMENT_GATEWAYS = ('sepay', 'monapay')
+SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+PAYMENT_GATEWAYS = ('sepay',)
 SEPAY_FREE_LIMIT = int(os.getenv('SEPAY_FREE_LIMIT', '50') or 50)
-MONAPAY_FREE_LIMIT = int(os.getenv('MONAPAY_FREE_LIMIT', '0') or 0)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -220,7 +219,6 @@ def load_payment_config():
         'active_gateway': gateway,
         'limits': {
             'sepay': int(limits.get('sepay', SEPAY_FREE_LIMIT) or 0),
-            'monapay': int(limits.get('monapay', MONAPAY_FREE_LIMIT) or 0),
         },
     }
 
@@ -875,18 +873,14 @@ HTML = """
     <div class="stats">
       <div class="stat-card s-total"><div class="stat-label">SePay đã dùng</div><div class="stat-num" id="pay-sepay-used">0/50</div></div>
       <div class="stat-card s-active"><div class="stat-label">SePay còn lại</div><div class="stat-num" id="pay-sepay-left">50</div></div>
-      <div class="stat-card s-warn"><div class="stat-label">MonaPay đã dùng</div><div class="stat-num" id="pay-mona-used">0</div></div>
-      <div class="stat-card s-expired"><div class="stat-label">Cổng đang dùng</div><div class="stat-num" id="pay-active-gateway-display" style="font-size:22px">SePay</div></div>
+      <div class="stat-card s-warn"><div class="stat-label">Tổng thành công</div><div class="stat-num" id="pay-total-success">0</div></div>
+      <div class="stat-card s-expired"><div class="stat-label">Cổng thanh toán</div><div class="stat-num" id="pay-active-gateway-display" style="font-size:22px">SePay</div></div>
     </div>
     <div class="card-box" style="margin-bottom:24px">
       <div class="section-title" style="margin-bottom:16px">⚙ Quản Lý Cổng Thanh Toán</div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto">
-        <div class="form-group"><label class="form-label">Cổng đang hoạt động</label>
-          <select class="form-input" id="pay-active-gateway"><option value="sepay">SePay</option><option value="monapay">MonaPay</option></select></div>
+      <div class="form-grid" style="grid-template-columns:1fr auto">
         <div class="form-group"><label class="form-label">Hạn mức SePay/tháng</label>
           <input class="form-input" id="pay-limit-sepay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
-        <div class="form-group"><label class="form-label">Hạn mức MonaPay/tháng</label>
-          <input class="form-input" id="pay-limit-monapay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
         <button class="btn btn-orange" onclick="savePaymentConfig()">💾 LƯU PAY</button>
       </div>
       <div class="setting-desc" id="pay-config-status" style="margin-top:12px">Đang tải cấu hình thanh toán...</div>
@@ -1219,23 +1213,19 @@ async function loadPaymentConfig(){
     const res=await fetch('/payment-config');
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Không tải được cấu hình Pay');
-    const active=data.active_gateway||'sepay';
-    document.getElementById('pay-active-gateway').value=active;
     document.getElementById('pay-limit-sepay').value=data.limits?.sepay ?? 0;
-    document.getElementById('pay-limit-monapay').value=data.limits?.monapay ?? 0;
-    const sepay=data.usage?.sepay||{}, mona=data.usage?.monapay||{};
+    const sepay=data.usage?.sepay||{};
     document.getElementById('pay-sepay-used').textContent=(sepay.limit ? sepay.month+'/'+sepay.limit : sepay.month);
     document.getElementById('pay-sepay-left').textContent=(sepay.remaining === null ? '∞' : sepay.remaining);
-    document.getElementById('pay-mona-used').textContent=(mona.limit ? mona.month+'/'+mona.limit : mona.month);
-    document.getElementById('pay-active-gateway-display').textContent=active==='monapay'?'MonaPay':'SePay';
-    document.getElementById('pay-config-status').textContent='Đang dùng '+(active==='monapay'?'MonaPay':'SePay')+' · Số lượt tính theo tháng '+(data.month||'');
+    document.getElementById('pay-total-success').textContent=sepay.total||0;
+    document.getElementById('pay-active-gateway-display').textContent='SePay';
+    document.getElementById('pay-config-status').textContent='Đang dùng SePay · Số lượt tính theo tháng '+(data.month||'');
   } catch(e) { document.getElementById('pay-config-status').textContent='Lỗi tải cấu hình Pay: '+e.message; }
 }
 async function savePaymentConfig(){
-  const active_gateway=document.getElementById('pay-active-gateway').value;
-  const limits={sepay:parseInt(document.getElementById('pay-limit-sepay').value||'0'),monapay:parseInt(document.getElementById('pay-limit-monapay').value||'0')};
-  if(limits.sepay<0||limits.monapay<0){showToast('Hạn mức không hợp lệ','error');return;}
-  const res=await fetch('/payment-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active_gateway,limits})});
+  const limits={sepay:parseInt(document.getElementById('pay-limit-sepay').value||'0')};
+  if(limits.sepay<0){showToast('Hạn mức không hợp lệ','error');return;}
+  const res=await fetch('/payment-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active_gateway:'sepay',limits})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã lưu cấu hình Pay','success');loadPaymentConfig();}
   else showToast('❌ '+(data.error||'Không lưu được Pay'),'error');
@@ -1826,8 +1816,6 @@ def create_payment_order():
         return jsonify({'error': 'machine_id hoặc gói gia hạn không hợp lệ'}), 400
     payment_cfg = load_payment_config()
     gateway = payment_cfg['active_gateway']
-    if gateway != 'sepay':
-        return jsonify({'error': 'MonaPay chưa được cấu hình API/QR trên server'}), 503
     if not SEPAY_BANK_CODE or not SEPAY_ACCOUNT_NO:
         return jsonify({'error': 'Server chưa cấu hình tài khoản SePay'}), 503
     licenses = load_licenses()
