@@ -736,7 +736,7 @@ HTML = """
         </label>
         <div class="perm-row">
           <div class="form-group"><label class="form-label">Chế Độ</label><select class="form-input" id="perm-mode"><option>Tất cả</option><option>Gọi Boss</option><option>Bắn Boss</option><option>Treo Zombie</option><option>Treo GP</option><option>Farm Thẻ</option><option>Xả Thẻ</option><option>Treo 20 Phút</option><option>Treo 60 Phút</option><option>Chạy Theo</option></select></div>
-          <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="perm-option"><option>Tất cả</option><option>Không chọn</option><option>RZ2 Thần Chết</option><option>RZ2 Lùm Tre Mid</option><option>RZ2 Nước</option><option>RZ4 Glacial Beast</option><option>RZ4 Gấu</option><option>RZ3 Gấu</option></select></div>
+          <div class="form-group"><label class="form-label">Tuỳ Chọn</label><select class="form-input" id="perm-option"><option>Tất cả</option><option>Không chọn</option><option>RZ2 Thần Chết</option><option>RZ2 Lùm Tre Mid</option><option>RZ2 Nước</option><option>RZ2 Khỉ Đá</option><option>RZ4 Glacial Beast</option><option>RZ4 Gấu</option><option>RZ4 Hang Cáo</option><option>RZ3 Gấu</option><option>RZ3 Hang Gargoyle</option></select></div>
           <div class="form-group"><label class="form-label">Cặp Đã Chọn</label><textarea class="form-input perm-text" id="permission-selected" readonly placeholder="Chưa thêm quyền nào"></textarea></div>
           <button type="button" class="btn btn-cyan" style="height:39px" id="btn-add-permission" onclick="addPermissionCombo()">+ QUYỀN</button>
           <button type="button" class="btn btn-red" style="height:39px" id="btn-clear-permission" onclick="clearAllowedCombos()">XÓA</button>
@@ -956,7 +956,7 @@ let currentExtendId = null;
 let currentPermissionId = null;
 let editPermissionCombos = [];
 const PERMISSION_MODES = ['Tất cả','Gọi Boss','Bắn Boss','Treo Zombie','Treo GP','Farm Thẻ','Xả Thẻ','Treo 20 Phút','Treo 60 Phút','Chạy Theo'];
-const PERMISSION_OPTIONS = ['Tất cả','Không chọn','RZ2 Thần Chết','RZ2 Lùm Tre Mid','RZ2 Nước','RZ4 Glacial Beast','RZ4 Gấu','RZ3 Gấu'];
+const PERMISSION_OPTIONS = ['Tất cả','Không chọn','RZ2 Thần Chết','RZ2 Lùm Tre Mid','RZ2 Nước','RZ2 Khỉ Đá','RZ4 Glacial Beast','RZ4 Gấu','RZ4 Hang Cáo','RZ3 Gấu','RZ3 Hang Gargoyle'];
 let selectedPermissionCombos = [];
 function renderPermissionPicker(){
   const modeSel=document.getElementById('perm-mode');
