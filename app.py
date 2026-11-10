@@ -1,10 +1,16 @@
-from flask import Flask, request, jsonify, render_template_string, send_from_directory
+from flask import Flask, request, jsonify, render_template_string, send_from_directory, session, redirect, url_for
 from datetime import datetime, timedelta, timezone
 from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
+from functools import wraps
 import json, os, re, secrets, base64, requests
 from urllib.parse import quote
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SESSION_SECRET", "").strip() or secrets.token_hex(32)
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "").strip()
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
 LICENSES_FILE = "licenses.json"
 BUG_LICENSES_FILE = "licensesBug.json"
 CALLBOSS_ACCOUNTS_FILE = "accountsCallBoss.json"
@@ -25,7 +31,7 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -41,6 +47,78 @@ GITHUB_DATA_PATHS = {
     "phienban.json": os.getenv("GITHUB_VERSION_PATH", "phienban.json").strip(),
 }
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def admin_password_valid(password):
+    if ADMIN_PASSWORD_HASH:
+        try:
+            return check_password_hash(ADMIN_PASSWORD_HASH, password)
+        except Exception:
+            return False
+    return bool(ADMIN_PASSWORD) and secrets.compare_digest(password, ADMIN_PASSWORD)
+
+def is_admin_logged_in():
+    return session.get("admin_authenticated") is True
+
+@app.route('/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = str(request.form.get('username') or '').strip()
+        password = str(request.form.get('password') or '')
+        if secrets.compare_digest(username, ADMIN_USERNAME) and admin_password_valid(password):
+            session.clear()
+            session['admin_authenticated'] = True
+            session['admin_username'] = username
+            return redirect(url_for('home'))
+        return render_template_string(ADMIN_LOGIN_HTML, error='Sai tài khoản hoặc mật khẩu'), 401
+    if is_admin_logged_in():
+        return redirect(url_for('home'))
+    return render_template_string(ADMIN_LOGIN_HTML, error='')
+
+@app.route('/logout', methods=['GET', 'POST'])
+def admin_logout():
+    session.clear()
+    return redirect(url_for('admin_login'))
+
+@app.before_request
+def require_admin_for_dashboard():
+    path = request.path
+    protected = (
+        path == '/' or
+        path in {'/config', '/licenses', '/payment-orders', '/bug-licenses',
+                 '/callboss-accounts', '/online', '/files'} or
+        path.startswith('/licenses/') or
+        path.startswith('/payment-orders/') or
+        path.startswith('/bug-licenses/') or
+        path.startswith('/callboss-accounts/') or
+        (path == '/room-info' and request.method == 'GET') or
+        (path.startswith('/room-info/') and request.method == 'DELETE') or
+        (path == '/files/upload') or
+        (path.startswith('/files/') and path != '/files/' and request.method == 'DELETE') or
+        (path == '/version' and request.method == 'POST')
+    )
+    if not protected or is_admin_logged_in():
+        return None
+    if path == '/':
+        return redirect(url_for('admin_login'))
+    return jsonify({'error': 'admin_login_required'}), 401
+
+ADMIN_LOGIN_HTML = r'''<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Đăng nhập TNDragon Tool</title>
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#101522;color:#eef2ff;font-family:Arial,sans-serif}
+.box{width:min(360px,calc(100% - 40px));padding:28px;background:#182238;border:1px solid #2b4268;border-radius:12px;box-shadow:0 18px 50px #0008}
+h1{margin:0 0 8px;color:#60a5fa;font-size:22px}.sub{color:#aab7cc;font-size:13px;margin-bottom:22px}
+label{display:block;color:#dbeafe;font-size:13px;margin:12px 0 6px}input{box-sizing:border-box;width:100%;padding:11px 12px;border:1px solid #496487;border-radius:7px;background:#fff;color:#111827;font-size:14px}
+button{width:100%;margin-top:20px;padding:11px;border:0;border-radius:7px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}button:hover{background:#1d4ed8}
+.error{margin-top:14px;color:#fca5a5;font-size:13px}
+</style></head><body><form class="box" method="post">
+<h1>TNDragon Tool</h1><div class="sub">Đăng nhập khu vực quản trị</div>
+<label>Tài khoản</label><input name="username" autocomplete="username" required>
+<label>Mật khẩu</label><input type="password" name="password" autocomplete="current-password" required>
+<button type="submit">Đăng nhập</button>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+</form></body></html>'''
 
 def github_enabled():
     # Repo Public có thể đọc khi chưa cấu hình token; token chỉ bắt buộc khi ghi.
