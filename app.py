@@ -1979,6 +1979,18 @@ def payment_config():
         used = usage[name]['month']
         usage[name]['limit'] = limit
         usage[name]['remaining'] = max(0, limit - used) if limit else None
+    if request.method == 'POST':
+        sepay = usage.get('sepay', {})
+        sepay_limit = int(sepay.get('limit', 0) or 0)
+        month_key = now_vn().strftime('%Y-%m')
+        if sepay_limit and int(sepay.get('remaining', 0) or 0) == 0:
+            app_cfg = load_config()
+            alerted = app_cfg.get('payment_usage_alerted') if isinstance(app_cfg.get('payment_usage_alerted'), dict) else {}
+            if not alerted.get(month_key):
+                alerted[month_key] = True
+                app_cfg['payment_usage_alerted'] = alerted
+                save_config(app_cfg)
+                notify_telegram_sepay_exhausted(month_key, int(sepay.get('month', 0) or 0), sepay_limit)
     return jsonify({**cfg, 'usage': usage, 'month': now_vn().strftime('%Y-%m')})
 
 @app.route('/payment/sepay-webhook', methods=['POST'])
