@@ -265,12 +265,22 @@ def record_payment_usage(month_key=None):
     app_cfg = load_config()
     totals = app_cfg.get('payment_usage_totals') if isinstance(app_cfg.get('payment_usage_totals'), dict) else {}
     adjustments = app_cfg.get('payment_usage_adjustment') if isinstance(app_cfg.get('payment_usage_adjustment'), dict) else {}
+    alerted = app_cfg.get('payment_usage_alerted') if isinstance(app_cfg.get('payment_usage_alerted'), dict) else {}
     if month_key in totals:
         totals[month_key] = int(totals.get(month_key, 0) or 0) + 1
     else:
         totals[month_key] = 1 + int(adjustments.get(month_key, 0) or 0)
     app_cfg['payment_usage_totals'] = totals
+    limit = int((app_cfg.get('payment_limits') or {}).get('sepay', SEPAY_FREE_LIMIT) or 0)
+    reached_limit = bool(limit and int(totals[month_key]) >= limit)
+    should_alert = reached_limit and not bool(alerted.get(month_key))
+    if should_alert:
+        alerted[month_key] = True
+    app_cfg['payment_usage_alerted'] = alerted
     save_config(app_cfg)
+    if should_alert:
+        notify_telegram_sepay_exhausted(month_key, int(totals[month_key]), limit)
+    return int(totals[month_key])
 
 def payment_webhook_authorized():
     if not SEPAY_WEBHOOK_API_KEY:
@@ -318,6 +328,32 @@ def notify_telegram_payment(order, transaction_id):
             app.logger.warning("Telegram payment notification failed: %s", response.text[:300])
     except Exception as exc:
         app.logger.warning("Telegram payment notification error: %s", exc)
+
+def notify_telegram_text(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
+    try:
+        response = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": message},
+            timeout=8,
+        )
+        if not response.ok:
+            app.logger.warning("Telegram notification failed: %s", response.text[:300])
+            return False
+        return True
+    except Exception as exc:
+        app.logger.warning("Telegram notification error: %s", exc)
+        return False
+
+def notify_telegram_sepay_exhausted(month_key, used, limit):
+    return notify_telegram_text(
+        "⚠️ SEPAY HẾT LƯỢT\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tháng: {month_key}\n"
+        f"📊 Đã dùng: {used}/{limit} lượt\n"
+        "⛔ Đã tạm khóa tạo QR/đơn mới."
+    )
 # ── Timezone UTC+7 ────────────────────────────────────────────────────────────
 TZ_VN = timezone(timedelta(hours=7))
 
@@ -1854,6 +1890,11 @@ def create_payment_order():
         return jsonify({'error': 'machine_id hoặc gói gia hạn không hợp lệ'}), 400
     payment_cfg = load_payment_config()
     gateway = payment_cfg['active_gateway']
+    if gateway == 'sepay':
+        sepay_usage = payment_usage().get('sepay', {})
+        sepay_limit = int(payment_cfg['limits'].get('sepay', 0) or 0)
+        if sepay_limit and int(sepay_usage.get('month', 0) or 0) >= sepay_limit:
+            return jsonify({'error': 'SePay đã hết lượt trong tháng', 'code': 'SEPAY_LIMIT_REACHED'}), 429
     if not SEPAY_BANK_CODE or not SEPAY_ACCOUNT_NO:
         return jsonify({'error': 'Server chưa cấu hình tài khoản SePay'}), 503
     licenses = load_licenses()
