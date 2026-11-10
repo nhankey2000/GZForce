@@ -31,7 +31,7 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -108,15 +108,15 @@ ADMIN_LOGIN_HTML = r'''<!doctype html>
 <style>
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(rgba(10,15,28,.68),rgba(10,15,28,.78)),url('/backgroup.jpg') center/cover fixed;color:#eef2ff;font-family:Arial,sans-serif}
 .box{width:min(360px,calc(100% - 40px));padding:28px;background:#182238;border:1px solid #2b4268;border-radius:12px;box-shadow:0 18px 50px #0008}
-h1{margin:0 0 8px;color:#60a5fa;font-size:22px}.sub{color:#aab7cc;font-size:13px;margin-bottom:22px}
+h1{margin:0 0 22px;color:#60a5fa;font-size:22px;text-align:center}
 label{display:block;color:#dbeafe;font-size:13px;margin:12px 0 6px}input{box-sizing:border-box;width:100%;padding:11px 12px;border:1px solid #496487;border-radius:7px;background:#fff;color:#111827;font-size:14px}
 button{width:100%;margin-top:20px;padding:11px;border:0;border-radius:7px;background:#2563eb;color:#fff;font-weight:700;cursor:pointer}button:hover{background:#1d4ed8}
 .error{margin-top:14px;color:#fca5a5;font-size:13px}
 </style></head><body><form class="box" method="post">
-<h1>TNDragon Tool</h1><div class="sub">Đăng nhập khu vực quản trị</div>
+<h1>Đăng Nhập</h1>
 <label>Tài khoản</label><input name="username" autocomplete="username" required>
 <label>Mật khẩu</label><input type="password" name="password" autocomplete="current-password" required>
-<button type="submit">Đăng nhập</button>
+<button type="submit">Đăng Nhập</button>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 </form></body></html>'''
 
