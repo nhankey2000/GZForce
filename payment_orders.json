@@ -150,9 +150,10 @@
     "amount": 50000,
     "transfer_content": "TN-4944019F-A2B-30",
     "invoice_code": "4944019F",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-10T12:44:19.972577+07:00",
     "expires_at": "2026-11-10T12:49:19.972417+07:00",
-    "transaction_id": null
+    "transaction_id": "98069450",
+    "paid_at": "2026-11-10T12:45:10.371076+07:00"
   }
 ]
