@@ -25,7 +25,7 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
 GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
 GITHUB_BRANCH = os.getenv("GITHUB_BRANCH", "main").strip()
@@ -536,9 +536,9 @@ HTML = """
   html,body{width:100%;min-height:100%;}
   body{background:linear-gradient(rgba(5,5,10,.48),rgba(5,5,10,.58)),url('/backgroup.jpg') center center/cover no-repeat fixed;color:var(--text);font-family:'Be Vietnam Pro',sans-serif;min-height:100vh;}
   .header{background:rgba(26,26,36,.78);backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,.12);padding:0 32px;
-    display:flex;align-items:center;justify-content:space-between;height:64px;
+    display:flex;align-items:center;justify-content:space-between;height:64px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;
     position:sticky;top:0;z-index:100;}
-  .header>div:first-child{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;}
+  .header>div:first-child{display:flex;align-items:center;flex-wrap:nowrap!important;min-width:max-content;}
   .header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
     background:linear-gradient(90deg,var(--orange),var(--cyan));}
   .logo{font-family:'Roboto Mono',monospace;font-size:20px;color:var(--orange);letter-spacing:2px;}
@@ -762,8 +762,8 @@ HTML = """
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Mã đơn</th><th>Machine ID</th><th>Số tiền</th><th>Số ngày</th><th>Nội dung</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thanh toán lúc</th><th>Hành động</th></tr></thead>
-        <tbody id="payment-tbody"><tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
+        <thead><tr><th>Mã đơn</th><th>Tên người dùng</th><th>Machine ID</th><th>Số tiền</th><th>Số ngày</th><th>Nội dung</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thanh toán lúc</th><th>Hành động</th></tr></thead>
+        <tbody id="payment-tbody"><tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Đang tải...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1058,18 +1058,24 @@ function formatPermissions(l){
   if(!combos.length)return '<span style="color:var(--sub);font-size:12px">Không khóa</span>';
   return '<div class="perm-badges">'+combos.map(c=>`<span class="perm-badge">${c.mode === 'Tất cả' && c.option === 'Tất cả' ? 'Tất cả' : (c.option === 'Không chọn' ? c.mode : c.mode+' · '+c.option)}</span>`).join('')+'</div>';
 }
+function formatDateVN(value){
+  if(!value)return '-';
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return value;
+  return new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d);
+}
 async function loadPayments(){
   const tbody=document.getElementById("payment-tbody");
   try {
     const res=await fetch("/payment-orders");
     const data=await res.json();
     document.getElementById("payment-total-count").textContent=data.length+" giao dịch";
-    if(!data.length){tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
+    if(!data.length){tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
     tbody.innerHTML=data.slice().reverse().map(o=>{
       const status=o.status==="paid" ? `<span class="status status-active">Đã thanh toán</span>` : `<span class="status status-warn">Đang chờ</span>`;
-      return `<tr><td class="mono">${o.order_id||""}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${o.created_at||""}</td><td>${o.paid_at||"-"}</td><td><button class="btn btn-red" onclick="deletePaymentOrder('${o.order_id||""}')">Xóa</button></td></tr>`;
+      return `<tr><td class="mono">${o.order_id||""}</td><td>${o.name||"-"}</td><td class="mono">${o.machine_id||""}</td><td>${Number(o.amount||0).toLocaleString("vi-VN")} đ</td><td>${o.days||0}</td><td class="mono">${o.transfer_content||""}</td><td>${status}</td><td>${formatDateVN(o.created_at)}</td><td>${formatDateVN(o.paid_at)}</td><td><button class="btn btn-red" onclick="deletePaymentOrder('${o.order_id||""}')">Xóa</button></td></tr>`;
     }).join("");
-  } catch(e) { tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
+  } catch(e) { tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--red);padding:40px">Lỗi tải giao dịch: ${e.message}</td></tr>`; }
 }
 async function deletePaymentOrder(orderId){
   if(!orderId || !confirm('Xóa giao dịch này?')) return;
@@ -1653,13 +1659,14 @@ def create_payment_order():
     order_id = 'TN-' + now_vn().strftime('%Y%m%d%H%M%S') + '-' + secrets.token_hex(3).upper()
     expires_at = (now_vn() + timedelta(minutes=30)).isoformat()
     machine_token = re.sub(r'[^A-Za-z0-9]', '', machine_id).upper()
-    if machine_token.startswith('TNDRAGON'):
-        machine_token = machine_token[len('TNDRAGON'):]
-    content = 'TNDRAGON' + machine_token[-24:]
+    machine_suffix = machine_token[-3:]
+    invoice_code = secrets.token_hex(4).upper()
+    content = f'TN-{invoice_code}-{machine_suffix}-{days}'
     order = {
         'order_id': order_id, 'machine_id': machine_id, 'days': days,
         'name': display_name,
         'amount': amount, 'transfer_content': content,
+        'invoice_code': invoice_code,
         'status': 'pending', 'created_at': now_vn().isoformat(),
         'expires_at': expires_at,
         'transaction_id': None,
@@ -1713,7 +1720,7 @@ def sepay_webhook():
         None,
     )
     if not order:
-        return jsonify({'matched': False}), 201
+        return jsonify({'matched': False, 'reason': 'Không tìm thấy đơn phù hợp với nội dung và số tiền'}), 201
     if any(x.get('transaction_id') == transaction_id for x in orders):
         return jsonify({'matched': True, 'duplicate': True}), 201
     licenses = load_licenses()
