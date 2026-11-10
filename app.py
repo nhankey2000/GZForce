@@ -215,15 +215,20 @@ def load_payment_config():
     if gateway not in PAYMENT_GATEWAYS:
         gateway = 'sepay'
     limits = cfg.get('payment_limits') if isinstance(cfg.get('payment_limits'), dict) else {}
+    adjustments = cfg.get('payment_usage_adjustment') if isinstance(cfg.get('payment_usage_adjustment'), dict) else {}
+    totals = cfg.get('payment_usage_totals') if isinstance(cfg.get('payment_usage_totals'), dict) else {}
     return {
         'active_gateway': gateway,
         'limits': {
             'sepay': int(limits.get('sepay', SEPAY_FREE_LIMIT) or 0),
         },
+        'adjustments': adjustments,
+        'totals': totals,
     }
 
 def payment_usage():
     orders = load_payment_orders()
+    cfg = load_payment_config()
     now = now_vn()
     month_key = now.strftime('%Y-%m')
     result = {}
@@ -237,8 +242,35 @@ def payment_usage():
             order for order in rows
             if str(order.get('paid_at') or order.get('created_at') or '').startswith(month_key)
         ]
-        result[gateway] = {'total': len(rows), 'month': len(month_rows)}
+        adjustment = int(cfg['adjustments'].get(month_key, 0) or 0) if gateway == 'sepay' else 0
+        total_map = cfg['totals']
+        if gateway == 'sepay' and month_key in total_map:
+            month_used = int(total_map[month_key] or 0)
+        else:
+            month_used = len(month_rows) + adjustment
+            if gateway == 'sepay':
+                app_cfg = load_config()
+                saved_totals = app_cfg.get('payment_usage_totals') if isinstance(app_cfg.get('payment_usage_totals'), dict) else {}
+                saved_totals[month_key] = month_used
+                app_cfg['payment_usage_totals'] = saved_totals
+                save_config(app_cfg)
+        result[gateway] = {
+            'total': len(rows), 'month': month_used,
+            'actual_month': len(month_rows), 'adjustment': adjustment,
+        }
     return result
+
+def record_payment_usage(month_key=None):
+    month_key = month_key or now_vn().strftime('%Y-%m')
+    app_cfg = load_config()
+    totals = app_cfg.get('payment_usage_totals') if isinstance(app_cfg.get('payment_usage_totals'), dict) else {}
+    adjustments = app_cfg.get('payment_usage_adjustment') if isinstance(app_cfg.get('payment_usage_adjustment'), dict) else {}
+    if month_key in totals:
+        totals[month_key] = int(totals.get(month_key, 0) or 0) + 1
+    else:
+        totals[month_key] = 1 + int(adjustments.get(month_key, 0) or 0)
+    app_cfg['payment_usage_totals'] = totals
+    save_config(app_cfg)
 
 def payment_webhook_authorized():
     if not SEPAY_WEBHOOK_API_KEY:
@@ -669,6 +701,8 @@ HTML = """
     letter-spacing:1px;border:1px solid transparent;transition:all .2s;color:var(--sub);}
   .nav-tab.active{background:var(--orange);color:#000;border-color:var(--orange);}
   .nav-tab:not(.active):hover{border-color:var(--border);color:var(--text);}
+  .logout-tab{background:rgba(0,229,255,.08);border-color:rgba(0,229,255,.35);color:var(--cyan)!important;}
+  .logout-tab:hover{background:var(--cyan);border-color:var(--cyan);color:#071018!important;}
   .header-right{display:flex;gap:10px;align-items:center;flex-shrink:0;white-space:nowrap;}
   .badge{font-family:'Roboto Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid;white-space:nowrap;display:inline-flex;align-items:center;}
   .badge-green{color:var(--green);border-color:var(--green);background:rgba(0,230,118,.08);}
@@ -821,7 +855,7 @@ HTML = """
     </div>
   </div>
   <div class="header-right">
-    <a class="nav-tab" href="/logout" style="text-decoration:none;color:var(--sub);white-space:nowrap">↪ ĐĂNG XUẤT</a>
+    <a class="nav-tab logout-tab" href="/logout" style="text-decoration:none;white-space:nowrap">↪ ĐĂNG XUẤT</a>
   </div>
 </div>
 <div class="main">
@@ -878,9 +912,11 @@ HTML = """
     </div>
     <div class="card-box" style="margin-bottom:24px">
       <div class="section-title" style="margin-bottom:16px">⚙ Quản Lý Cổng Thanh Toán</div>
-      <div class="form-grid" style="grid-template-columns:1fr auto">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr auto">
         <div class="form-group"><label class="form-label">Hạn mức SePay/tháng</label>
           <input class="form-input" id="pay-limit-sepay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
+        <div class="form-group"><label class="form-label">Bù lượt cũ tháng này</label>
+          <input class="form-input" id="pay-usage-adjustment" type="number" min="0" placeholder="Ví dụ: 11"/></div>
         <button class="btn btn-orange" onclick="savePaymentConfig()">💾 LƯU PAY</button>
       </div>
       <div class="setting-desc" id="pay-config-status" style="margin-top:12px">Đang tải cấu hình thanh toán...</div>
@@ -1215,6 +1251,7 @@ async function loadPaymentConfig(){
     if(!res.ok) throw new Error(data.error||'Không tải được cấu hình Pay');
     document.getElementById('pay-limit-sepay').value=data.limits?.sepay ?? 0;
     const sepay=data.usage?.sepay||{};
+    document.getElementById('pay-usage-adjustment').value=sepay.adjustment ?? 0;
     document.getElementById('pay-sepay-used').textContent=(sepay.limit ? sepay.month+'/'+sepay.limit : sepay.month);
     document.getElementById('pay-sepay-left').textContent=(sepay.remaining === null ? '∞' : sepay.remaining);
     document.getElementById('pay-total-success').textContent=sepay.total||0;
@@ -1224,8 +1261,9 @@ async function loadPaymentConfig(){
 }
 async function savePaymentConfig(){
   const limits={sepay:parseInt(document.getElementById('pay-limit-sepay').value||'0')};
-  if(limits.sepay<0){showToast('Hạn mức không hợp lệ','error');return;}
-  const res=await fetch('/payment-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active_gateway:'sepay',limits})});
+  const adjustment=parseInt(document.getElementById('pay-usage-adjustment').value||'0');
+  if(limits.sepay<0 || adjustment<0){showToast('Hạn mức hoặc số lượt bù không hợp lệ','error');return;}
+  const res=await fetch('/payment-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({active_gateway:'sepay',limits,adjustment})});
   const data=await res.json();
   if(res.ok){showToast('✓ Đã lưu cấu hình Pay','success');loadPaymentConfig();}
   else showToast('❌ '+(data.error||'Không lưu được Pay'),'error');
@@ -1876,11 +1914,24 @@ def payment_config():
                 normalized_limits[name] = max(0, int(limits.get(name, cfg['limits'][name])))
             except (TypeError, ValueError):
                 return jsonify({'error': 'Hạn mức không hợp lệ'}), 400
+        try:
+            adjustment = max(0, int(data.get('adjustment', cfg['adjustments'].get(now_vn().strftime('%Y-%m'), 0)) or 0))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Số lượt bù không hợp lệ'}), 400
         app_cfg = load_config()
         app_cfg['payment_gateway'] = gateway
         app_cfg['payment_limits'] = normalized_limits
+        month_key = now_vn().strftime('%Y-%m')
+        adjustments = app_cfg.get('payment_usage_adjustment') if isinstance(app_cfg.get('payment_usage_adjustment'), dict) else {}
+        totals = app_cfg.get('payment_usage_totals') if isinstance(app_cfg.get('payment_usage_totals'), dict) else {}
+        old_adjustment = int(adjustments.get(month_key, 0) or 0)
+        if month_key in totals:
+            totals[month_key] = max(0, int(totals.get(month_key, 0) or 0) + adjustment - old_adjustment)
+        adjustments[month_key] = adjustment
+        app_cfg['payment_usage_adjustment'] = adjustments
+        app_cfg['payment_usage_totals'] = totals
         save_config(app_cfg)
-        cfg = {'active_gateway': gateway, 'limits': normalized_limits}
+        cfg = {'active_gateway': gateway, 'limits': normalized_limits, 'adjustments': adjustments, 'totals': totals}
     usage = payment_usage()
     for name in PAYMENT_GATEWAYS:
         limit = cfg['limits'][name]
@@ -1944,6 +1995,7 @@ def sepay_webhook():
     order['transaction_id'] = transaction_id
     order['paid_at'] = now_vn().isoformat()
     save_payment_orders(orders)
+    record_payment_usage()
     notify_telegram_payment(order, transaction_id)
     return jsonify({'matched': True, 'status': 'paid', 'machine_id': order['machine_id'], 'new_expire': license_item['expires_at']}), 201
 @app.route('/payment-orders', methods=['GET'])
