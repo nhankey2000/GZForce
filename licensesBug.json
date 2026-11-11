@@ -8,13 +8,6 @@
   },
   {
     "id": 2,
-    "name": "Dương SOS",
-    "machine_id": "TNDRAGON-68467A9002D729B7",
-    "active": true,
-    "created_at": "2026-01-01T00:00:00"
-  },
-  {
-    "id": 3,
     "name": "Máy 9",
     "machine_id": "TNDRAGON-81B7E237E5E18A2B",
     "active": true,
