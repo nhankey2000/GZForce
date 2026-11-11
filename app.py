@@ -899,9 +899,8 @@ HTML = """
 </div>
 <div class="main">
   <div class="tab-page active" id="tab-licenses">
-    <div class="stats" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+    <div class="stats" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       <div class="stat-card s-total"><div class="stat-label">Tổng License</div><div class="stat-num" id="stat-total">0</div></div>
-      <div class="stat-card s-active"><div class="stat-label">Hoạt Động</div><div class="stat-num" id="stat-active">0</div></div>
       <div class="stat-card s-expired"><div class="stat-label">Hết Hạn</div><div class="stat-num" id="stat-expired">0</div></div>
       <div class="stat-card s-warn"><div class="stat-label">Sắp Hết Hạn</div><div class="stat-num" id="stat-warn">0</div></div>
       <div class="stat-card s-warn"><div class="stat-label">Online</div><div class="stat-num" id="stat-online">0</div></div>
@@ -1383,17 +1382,16 @@ async function loadOnline() {
   } catch(e) {}
 }
 function updateStats(data) {
-  const total=data.length, active=data.filter(l=>l.days_left>0).length,
+  const total=data.length,
     expired=data.filter(l=>l.days_left<=0).length, warn=data.filter(l=>l.days_left>0&&l.days_left<=7).length;
   document.getElementById('stat-total').textContent=total;
-  document.getElementById('stat-active').textContent=active;
   document.getElementById('stat-expired').textContent=expired;
   document.getElementById('total-count').textContent=total+' license';
   document.getElementById('stat-warn').textContent=warn;
   const badgeActive=document.getElementById('badge-active');
   const badgeExpired=document.getElementById('badge-expired');
   const badgeWarn=document.getElementById('badge-warn');
-  if (badgeActive) badgeActive.textContent='● '+active+' Active';
+  if (badgeActive) badgeActive.textContent='● '+data.filter(l=>l.days_left>0).length+' Active';
   if (badgeExpired) badgeExpired.textContent='● '+expired+' Expired';
   if (badgeWarn) badgeWarn.textContent='⚠ '+warn+' Expiring';
 }
