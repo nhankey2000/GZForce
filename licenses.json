@@ -248,7 +248,7 @@
     "name": "Trần Minh Bảo",
     "machine_id": "TNDRAGON-FD75D38EED99859C",
     "created_at": "2026-08-18T00:00:00",
-    "expires_at": "2026-11-15T00:00:00",
+    "expires_at": "2026-12-15T23:59:59",
     "permissions": {
       "allowed_combos": [
         {
