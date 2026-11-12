@@ -42,20 +42,6 @@
     "paid_at": "2026-11-10T19:25:28.589286+07:00"
   },
   {
-    "order_id": "TN-20261112131313-AE7A74",
-    "machine_id": "TNDRAGON-FD75D38EED99859C",
-    "days": 60,
-    "name": "Trần Minh Bảo",
-    "gateway": "sepay",
-    "amount": 100000,
-    "transfer_content": "TN-6EAB6F77-59C-60",
-    "invoice_code": "6EAB6F77",
-    "status": "pending",
-    "created_at": "2026-11-12T13:13:13.303888+07:00",
-    "expires_at": "2026-11-12T13:18:13.303744+07:00",
-    "transaction_id": null
-  },
-  {
     "order_id": "TN-20261112131326-2378B1",
     "machine_id": "TNDRAGON-FD75D38EED99859C",
     "days": 30,
