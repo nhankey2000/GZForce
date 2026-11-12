@@ -1,5 +1,7 @@
 {
   "version": "2.2",
-  "updated_at": "2026-11-12T06:00:01.385247+07:00",
-  "release_notes": "Sửa lỗi treo auto khi khởi động.Cập nhật TNLogin đăng nhập game. Thanh toán tự động bằng QR SePay."
+  "updated_at": "2026-11-12T11:06:19.735757+07:00",
+  "release_notes": "Sửa lỗi treo auto khi khởi động.Cập nhật TNLogin đăng nhập game. Thanh toán tự động bằng QR SePay.",
+  "updater_version": "1.1",
+  "updater_url": ""
 }
