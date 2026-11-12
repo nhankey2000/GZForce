@@ -31,7 +31,7 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
 PAYMENT_GATEWAYS = ('sepay',)
 SEPAY_FREE_LIMIT = int(os.getenv('SEPAY_FREE_LIMIT', '50') or 50)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
@@ -574,9 +574,8 @@ def load_version_config():
                 'updated_at': data.get('updated_at') or '',
                 'release_notes': str(data.get('release_notes') or '').strip(),
                 'updater_version': str(data.get('updater_version') or '').strip(),
-                'updater_url': str(data.get('updater_url') or '').strip(),
             }
-        return {'version': '', 'updated_at': '', 'release_notes': '', 'updater_version': '', 'updater_url': ''}
+        return {'version': '', 'updated_at': '', 'release_notes': '', 'updater_version': ''}
     if not os.path.exists(PHIENBAN_FILE):
         return {'version': '', 'updated_at': '', 'release_notes': ''}
     try:
@@ -588,19 +587,17 @@ def load_version_config():
                 'updated_at': data.get('updated_at') or '',
                 'release_notes': str(data.get('release_notes') or '').strip(),
                 'updater_version': str(data.get('updater_version') or '').strip(),
-                'updater_url': str(data.get('updater_url') or '').strip(),
             }
     except Exception:
         pass
-    return {'version': '', 'updated_at': '', 'release_notes': '', 'updater_version': '', 'updater_url': ''}
+    return {'version': '', 'updated_at': '', 'release_notes': '', 'updater_version': ''}
 
-def save_version_config(version, release_notes='', updater_version='', updater_url=''):
+def save_version_config(version, release_notes='', updater_version=''):
     data = {
         'version': str(version).strip(),
         'updated_at': now_vn().isoformat(),
         'release_notes': str(release_notes or '').strip(),
         'updater_version': str(updater_version or '').strip(),
-        'updater_url': str(updater_url or '').strip(),
     }
     if not persistent_json_write(PHIENBAN_FILE, data, "Update version metadata"):
         with open(PHIENBAN_FILE, 'w', encoding='utf-8') as f:
@@ -1108,10 +1105,6 @@ HTML = """
             <label class="form-label">Phiên bản Updater</label>
             <input class="form-input" id="inp-updater-version" placeholder="1.1" />
           </div>
-          <div class="form-group" style="margin-top:12px">
-            <label class="form-label">Link tải TNDragonUpdater.exe</label>
-            <input class="form-input" id="inp-updater-url" placeholder="https://drive.google.com/file/d/.../view" />
-          </div>
           <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveVersion()">💾 LƯU PHIÊN BẢN</button>
           <div class="setting-desc" style="line-height:2">
             Lưu trong <code style="color:var(--orange)">config.json</code>.<br>
@@ -1349,12 +1342,10 @@ async function loadConfig() {
   const version = versionCfg.version || '';
   const releaseNotes = versionCfg.release_notes || '';
   const updaterVersion = versionCfg.updater_version || '';
-  const updaterUrl = versionCfg.updater_url || '';
   document.getElementById('inp-room-name').value = room;
   document.getElementById('inp-version').value = version;
   document.getElementById('inp-release-notes').value = releaseNotes;
   document.getElementById('inp-updater-version').value = updaterVersion;
-  document.getElementById('inp-updater-url').value = updaterUrl;
   document.getElementById('preview-room').textContent = room || '(chưa đặt)';
   document.getElementById('current-room-display').textContent = room || '(chưa đặt)';
   document.getElementById('current-version-display').textContent = version || '(chưa đặt)';
@@ -1368,8 +1359,7 @@ async function saveVersion() {
   const version = document.getElementById('inp-version').value.trim();
   const release_notes = document.getElementById('inp-release-notes').value.trim();
   const updater_version = document.getElementById('inp-updater-version').value.trim();
-  const updater_url = document.getElementById('inp-updater-url').value.trim();
-  const res = await fetch('/version', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version, release_notes, updater_version, updater_url}) });
+  const res = await fetch('/version', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({version, release_notes, updater_version}) });
   if (res.ok) { showToast('✓ Đã lưu phiên bản', 'success'); loadConfig(); }
   else { const data = await res.json(); showToast('❌ ' + (data.error || 'Lỗi lưu phiên bản'), 'error'); }
 }
@@ -1677,7 +1667,6 @@ def get_version():
         'updated_at': server['updated_at'],
         'release_notes': server.get('release_notes', ''),
         'updater_version': server.get('updater_version', ''),
-        'updater_url': server.get('updater_url', ''),
         'client_version': client_version,
         'update_available': bool(client_parsed and server_parsed and client_parsed < server_parsed)
     })
@@ -1688,12 +1677,11 @@ def set_version():
     version = str(data.get('version') or '').strip()
     release_notes = str(data.get('release_notes') or '').strip()
     updater_version = str(data.get('updater_version') or '').strip()
-    updater_url = str(data.get('updater_url') or '').strip()
     if not version or parse_version(version) is None:
         return jsonify({'error': 'version không hợp lệ, ví dụ 1.1 hoặc 2.0.3'}), 400
     if updater_version and parse_version(updater_version) is None:
         return jsonify({'error': 'Phiên bản updater không hợp lệ, ví dụ 1.1 hoặc 2.0'}), 400
-    saved = save_version_config(version, release_notes, updater_version, updater_url)
+    saved = save_version_config(version, release_notes, updater_version)
     return jsonify({'success': True, **saved})
 
 @app.route('/')
