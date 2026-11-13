@@ -393,7 +393,7 @@
     "machine_id": "TNDRAGON-B3F0D8BCB8E4E79A",
     "created_at": "2026-11-13T07:31:43.709076+07:00",
     "permissions": {
-      "allow_change_card": false,
+      "allow_change_card": true,
       "allowed_combos": [
         {
           "mode": "Tất cả",
