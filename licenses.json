@@ -386,5 +386,21 @@
       ]
     },
     "expires_at": "2028-05-01T23:59:59"
+  },
+  {
+    "id": 25,
+    "name": "Hoài Trần",
+    "machine_id": "TNDRAGON-B3F0D8BCB8E4E79A",
+    "created_at": "2026-11-13T07:31:43.709076+07:00",
+    "permissions": {
+      "allow_change_card": false,
+      "allowed_combos": [
+        {
+          "mode": "Tất cả",
+          "option": "Tất cả"
+        }
+      ]
+    },
+    "expires_at": "2026-12-13T23:59:59"
   }
 ]
