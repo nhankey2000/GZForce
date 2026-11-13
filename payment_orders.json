@@ -65,9 +65,10 @@
     "amount": 50000,
     "transfer_content": "TN-1891C064-79A-30",
     "invoice_code": "1891C064",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-13T07:31:14.743256+07:00",
     "expires_at": "2026-11-13T07:36:14.743213+07:00",
-    "transaction_id": null
+    "transaction_id": "98934227",
+    "paid_at": "2026-11-13T07:31:45.581365+07:00"
   }
 ]
