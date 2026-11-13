@@ -1,6 +1,6 @@
 {
-  "version": "2.2",
-  "updated_at": "2026-11-12T11:12:09.026317+07:00",
-  "release_notes": "Sửa lỗi treo auto khi khởi động.Cập nhật TNLogin đăng nhập game. Thanh toán tự động bằng QR SePay.",
+  "version": "2.3",
+  "updated_at": "2026-11-13T19:38:51.136264+07:00",
+  "release_notes": "Sửa lỗi di chuyển lỗi Farm khỉ đá. Cập nhật TNLogin đăng nhập game. Thanh toán tự động bằng QR SePay.",
   "updater_version": "1.1"
 }
