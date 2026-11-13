@@ -972,7 +972,10 @@ HTML = """
         <div>
           <div class="section-title" style="margin-bottom:12px">💰 Tổng Doanh Thu</div>
           <label class="form-label" for="pay-revenue-month">Bộ lọc tháng</label>
-          <input class="form-input" id="pay-revenue-month" type="month" onchange="updateRevenueSummary()"/>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="form-input" id="pay-revenue-month" type="month" onchange="updateRevenueSummary()"/>
+            <button class="btn btn-cyan" type="button" onclick="showAllRevenue()" style="white-space:nowrap">Tất cả</button>
+          </div>
           <div class="revenue-total" id="pay-revenue-total">0 đ</div>
         </div>
         <div class="setting-desc" id="pay-revenue-detail">0 giao dịch đã thanh toán</div>
@@ -1294,15 +1297,22 @@ function formatDateVN(value){
   return new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d);
 }
 let paymentOrders = [];
-function updateRevenueSummary(){
+function updateRevenueSummary(showAll=false){
   const input = document.getElementById('pay-revenue-month');
   if(!input) return;
-  if(!input.value) input.value = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit'}).format(new Date());
+  if(!showAll && !input.value) input.value = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit'}).format(new Date());
   const month = input.value;
-  const paid = paymentOrders.filter(o => o.status === 'paid' && String(o.paid_at || o.created_at || '').slice(0,7) === month);
+  const paid = paymentOrders.filter(o => o.status === 'paid' && (showAll || String(o.paid_at || o.created_at || '').slice(0,7) === month));
   const total = paid.reduce((sum,o) => sum + Number(o.amount || 0), 0);
   document.getElementById('pay-revenue-total').textContent = total.toLocaleString('vi-VN') + ' đ';
-  document.getElementById('pay-revenue-detail').textContent = paid.length + ' giao dịch đã thanh toán trong tháng ' + month;
+  document.getElementById('pay-revenue-detail').textContent = showAll
+    ? paid.length + ' giao dịch đã thanh toán trong tất cả các tháng'
+    : paid.length + ' giao dịch đã thanh toán trong tháng ' + month;
+}
+function showAllRevenue(){
+  const input = document.getElementById('pay-revenue-month');
+  if(input) input.value = '';
+  updateRevenueSummary(true);
 }
 async function loadPayments(){
   const tbody=document.getElementById("payment-tbody");
