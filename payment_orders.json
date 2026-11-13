@@ -27,21 +27,6 @@
     "paid_at": "2026-11-10T12:45:10.371076+07:00"
   },
   {
-    "order_id": "TN-20261110192451-E179F1",
-    "machine_id": "TNDRAGON-81B7E237E5E18A2B",
-    "days": 30,
-    "name": "Thành Nhân",
-    "gateway": "sepay",
-    "amount": 50000,
-    "transfer_content": "TN-710B8D07-A2B-30",
-    "invoice_code": "710B8D07",
-    "status": "paid",
-    "created_at": "2026-11-10T19:24:51.872013+07:00",
-    "expires_at": "2026-11-10T19:29:51.871810+07:00",
-    "transaction_id": "98202764",
-    "paid_at": "2026-11-10T19:25:28.589286+07:00"
-  },
-  {
     "order_id": "TN-20261112131326-2378B1",
     "machine_id": "TNDRAGON-FD75D38EED99859C",
     "days": 30,
