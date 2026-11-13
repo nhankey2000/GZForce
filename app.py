@@ -31,7 +31,7 @@ SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 PAYMENT_GATEWAYS = ('sepay',)
 SEPAY_FREE_LIMIT = int(os.getenv('SEPAY_FREE_LIMIT', '50') or 50)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
@@ -836,6 +836,10 @@ HTML = """
   .toast.success{border-color:var(--green);color:var(--green);}
   .toast.error{border-color:var(--red);color:var(--red);}
   .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .payment-config-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:16px;align-items:stretch;margin-bottom:24px;}
+  .payment-config-grid .card-box{margin-bottom:0;}
+  .revenue-card{display:flex;flex-direction:column;justify-content:space-between;min-height:172px;}
+  .revenue-total{font-family:'Roboto Mono',monospace;font-size:30px;color:var(--green);margin-top:14px;}
   .setting-item{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:20px;}
   .setting-desc{font-size:13px;color:var(--sub);margin-bottom:16px;line-height:1.6;}
   .api-preview{background:var(--bg);border:1px solid var(--border);border-radius:6px;
@@ -870,6 +874,7 @@ HTML = """
     th,td{padding:12px 10px;font-size:12px;}
     .actions{gap:6px;flex-wrap:nowrap;}
     .settings-grid{grid-template-columns:1fr;}
+    .payment-config-grid{grid-template-columns:1fr;}
     .modal{width:calc(100vw - 28px);padding:22px;}
     .toast{left:12px;right:12px;bottom:12px;}
   }
@@ -902,7 +907,7 @@ HTML = """
 </div>
 <div class="main">
   <div class="tab-page active" id="tab-licenses">
-    <div class="stats" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="stats">
       <div class="stat-card s-total"><div class="stat-label">Tổng License</div><div class="stat-num" id="stat-total">0</div></div>
       <div class="stat-card s-expired"><div class="stat-label">Hết Hạn</div><div class="stat-num" id="stat-expired">0</div></div>
       <div class="stat-card s-warn"><div class="stat-label">Sắp Hết Hạn</div><div class="stat-num" id="stat-warn">0</div></div>
@@ -951,16 +956,27 @@ HTML = """
       <div class="stat-card s-warn"><div class="stat-label">Tổng thành công</div><div class="stat-num" id="pay-total-success">0</div></div>
       <div class="stat-card s-expired"><div class="stat-label">Cổng thanh toán</div><div class="stat-num" id="pay-active-gateway-display" style="font-size:22px">SePay</div></div>
     </div>
-    <div class="card-box" style="margin-bottom:24px">
-      <div class="section-title" style="margin-bottom:16px">⚙ Quản Lý Cổng Thanh Toán</div>
-      <div class="form-grid" style="grid-template-columns:1fr 1fr auto">
-        <div class="form-group"><label class="form-label">Hạn mức SePay/tháng</label>
-          <input class="form-input" id="pay-limit-sepay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
-        <div class="form-group"><label class="form-label">Bù lượt cũ tháng này</label>
-          <input class="form-input" id="pay-usage-adjustment" type="number" min="0" placeholder="Ví dụ: 11"/></div>
-        <button class="btn btn-orange" onclick="savePaymentConfig()">💾 LƯU PAY</button>
+    <div class="payment-config-grid">
+      <div class="card-box">
+        <div class="section-title" style="margin-bottom:16px">⚙ Quản Lý Cổng Thanh Toán</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr auto">
+          <div class="form-group"><label class="form-label">Hạn mức SePay/tháng</label>
+            <input class="form-input" id="pay-limit-sepay" type="number" min="0" placeholder="0 = không giới hạn"/></div>
+          <div class="form-group"><label class="form-label">Bù lượt cũ tháng này</label>
+            <input class="form-input" id="pay-usage-adjustment" type="number" min="0" placeholder="Ví dụ: 11"/></div>
+          <button class="btn btn-orange" onclick="savePaymentConfig()">💾 LƯU PAY</button>
+        </div>
+        <div class="setting-desc" id="pay-config-status" style="margin-top:12px">Đang tải cấu hình thanh toán...</div>
       </div>
-      <div class="setting-desc" id="pay-config-status" style="margin-top:12px">Đang tải cấu hình thanh toán...</div>
+      <div class="card-box revenue-card">
+        <div>
+          <div class="section-title" style="margin-bottom:12px">💰 Tổng Doanh Thu</div>
+          <label class="form-label" for="pay-revenue-month">Bộ lọc tháng</label>
+          <input class="form-input" id="pay-revenue-month" type="month" onchange="updateRevenueSummary()"/>
+          <div class="revenue-total" id="pay-revenue-total">0 đ</div>
+        </div>
+        <div class="setting-desc" id="pay-revenue-detail">0 giao dịch đã thanh toán</div>
+      </div>
     </div>
     <div class="section-header">
       <div class="section-title">Lịch Sử Giao Dịch</div>
@@ -1277,11 +1293,24 @@ function formatDateVN(value){
   if(Number.isNaN(d.getTime()))return value;
   return new Intl.DateTimeFormat('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(d);
 }
+let paymentOrders = [];
+function updateRevenueSummary(){
+  const input = document.getElementById('pay-revenue-month');
+  if(!input) return;
+  if(!input.value) input.value = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit'}).format(new Date());
+  const month = input.value;
+  const paid = paymentOrders.filter(o => o.status === 'paid' && String(o.paid_at || o.created_at || '').slice(0,7) === month);
+  const total = paid.reduce((sum,o) => sum + Number(o.amount || 0), 0);
+  document.getElementById('pay-revenue-total').textContent = total.toLocaleString('vi-VN') + ' đ';
+  document.getElementById('pay-revenue-detail').textContent = paid.length + ' giao dịch đã thanh toán trong tháng ' + month;
+}
 async function loadPayments(){
   const tbody=document.getElementById("payment-tbody");
   try {
     const res=await fetch("/payment-orders");
     const data=await res.json();
+    paymentOrders = Array.isArray(data) ? data : [];
+    updateRevenueSummary();
     document.getElementById("payment-total-count").textContent=data.length+" giao dịch";
     if(!data.length){tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:40px">Chưa có giao dịch</td></tr>`;return;}
     tbody.innerHTML=data.slice().reverse().map(o=>{
