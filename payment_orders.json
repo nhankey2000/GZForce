@@ -95,9 +95,10 @@
     "amount": 100000,
     "transfer_content": "TN-ED5D18C3-EDA-60",
     "invoice_code": "ED5D18C3",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-13T17:51:57.111688+07:00",
     "expires_at": "2026-11-13T17:56:57.111522+07:00",
-    "transaction_id": null
+    "transaction_id": "99097474",
+    "paid_at": "2026-11-13T17:52:59.044889+07:00"
   }
 ]
