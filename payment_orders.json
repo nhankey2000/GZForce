@@ -80,9 +80,10 @@
     "amount": 50000,
     "transfer_content": "TN-81AD2649-648-30",
     "invoice_code": "81AD2649",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-13T09:12:45.585238+07:00",
     "expires_at": "2026-11-13T09:17:45.585205+07:00",
-    "transaction_id": null
+    "transaction_id": "98952970",
+    "paid_at": "2026-11-13T09:13:19.043939+07:00"
   }
 ]
