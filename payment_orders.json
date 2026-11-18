@@ -95,9 +95,10 @@
     "amount": 50000,
     "transfer_content": "TN-173EB443-A84-30",
     "invoice_code": "173EB443",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-18T21:53:16.570209+07:00",
     "expires_at": "2026-11-18T21:58:16.570173+07:00",
-    "transaction_id": null
+    "transaction_id": "100649853",
+    "paid_at": "2026-11-18T21:53:44.819599+07:00"
   }
 ]
