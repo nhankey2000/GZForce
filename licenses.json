@@ -402,5 +402,21 @@
       ]
     },
     "expires_at": "2026-12-13T23:59:59"
+  },
+  {
+    "id": 26,
+    "name": "Đoàn Hồng Đức",
+    "machine_id": "TNDRAGON-FDE63F3260FB2CAA",
+    "expires_at": "2026-12-18T23:59:59",
+    "created_at": "2026-11-18T21:51:31.422304+07:00",
+    "permissions": {
+      "allow_change_card": false,
+      "allowed_combos": [
+        {
+          "mode": "Tất cả",
+          "option": "Tất cả"
+        }
+      ]
+    }
   }
 ]
