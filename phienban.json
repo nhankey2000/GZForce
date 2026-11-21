@@ -1,6 +1,6 @@
 {
-  "version": "2.5",
-  "updated_at": "2026-11-19T10:42:37.547672+07:00",
+  "version": "2.6",
+  "updated_at": "2026-11-21T10:28:14.642740+07:00",
   "release_notes": "Update sửa lỗi tạo phòng theo giao diện game, cập nhật nút tự động update tool",
-  "updater_version": "1.3"
+  "updater_version": "1.4"
 }
