@@ -356,22 +356,6 @@
     }
   },
   {
-    "id": 27,
-    "name": "Thành Nhân",
-    "machine_id": "TNDRAGON-81B7E237E5E18A2B",
-    "created_at": "2026-11-08T10:20:51.781178+07:00",
-    "permissions": {
-      "allow_change_card": true,
-      "allowed_combos": [
-        {
-          "mode": "Tất cả",
-          "option": "Tất cả"
-        }
-      ]
-    },
-    "expires_at": "2028-05-01T23:59:59"
-  },
-  {
     "id": 25,
     "name": "Hoài Trần",
     "machine_id": "TNDRAGON-B3F0D8BCB8E4E79A",
