@@ -110,9 +110,10 @@
     "amount": 50000,
     "transfer_content": "TN-BD36207B-DC5-30",
     "invoice_code": "BD36207B",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-22T09:03:58.724233+07:00",
     "expires_at": "2026-11-22T09:08:58.724195+07:00",
-    "transaction_id": null
+    "transaction_id": "101558081",
+    "paid_at": "2026-11-22T09:04:34.813370+07:00"
   }
 ]
