@@ -409,7 +409,7 @@
     "machine_id": "TNDRAGON-254C5BBF98E41DC5",
     "created_at": "2026-11-22T09:04:33.473468+07:00",
     "permissions": {
-      "allow_change_card": false,
+      "allow_change_card": true,
       "allowed_combos": [
         {
           "mode": "Tất cả",
