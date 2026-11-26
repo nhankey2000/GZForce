@@ -125,9 +125,10 @@
     "amount": 50000,
     "transfer_content": "TN-869E20FC-1FD-30",
     "invoice_code": "869E20FC",
-    "status": "pending",
+    "status": "paid",
     "created_at": "2026-11-26T21:33:23.139219+07:00",
     "expires_at": "2026-11-26T21:38:23.139134+07:00",
-    "transaction_id": null
+    "transaction_id": "102853903",
+    "paid_at": "2026-11-26T21:34:09.816433+07:00"
   }
 ]
