@@ -115,19 +115,5 @@
     "expires_at": "2026-11-22T09:08:58.724195+07:00",
     "transaction_id": "101558081",
     "paid_at": "2026-11-22T09:04:34.813370+07:00"
-  },
-  {
-    "order_id": "TN-20261126120913-71DD08",
-    "machine_id": "TNDRAGON-755662A268093DB2",
-    "days": 30,
-    "name": "tran hooai",
-    "gateway": "sepay",
-    "amount": 50000,
-    "transfer_content": "TN-EB462330-DB2-30",
-    "invoice_code": "EB462330",
-    "status": "pending",
-    "created_at": "2026-11-26T12:09:13.804242+07:00",
-    "expires_at": "2026-11-26T12:14:13.804193+07:00",
-    "transaction_id": null
   }
 ]
