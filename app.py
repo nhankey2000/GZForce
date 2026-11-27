@@ -23,6 +23,7 @@ ONLINE_FILE   = "online.json"
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {'zip'}
 ONLINE_TIMEOUT_SECONDS = 180
+ROOM_INFO_TIMEOUT_SECONDS = int(os.getenv('ROOM_INFO_TIMEOUT_SECONDS', '180') or 180)
 PAYMENT_ORDERS_FILE = "payment_orders.json"
 SEPAY_BANK_CODE = os.getenv("SEPAY_BANK_CODE", "").strip()
 SEPAY_ACCOUNT_NO = os.getenv("SEPAY_ACCOUNT_NO", "").strip()
@@ -30,8 +31,10 @@ SEPAY_ACCOUNT_NAME = os.getenv("SEPAY_ACCOUNT_NAME", "").strip()
 SEPAY_WEBHOOK_API_KEY = os.getenv("SEPAY_WEBHOOK_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+ZALO_BOT_TOKEN = os.getenv("ZALO_BOT_TOKEN", "").strip()
+ZALO_CHAT_ID = os.getenv("ZALO_CHAT_ID", "").strip()
 SEPAY_QR_TEMPLATE = os.getenv("SEPAY_QR_TEMPLATE", "https://qr.sepay.vn/img?acc={account}&bank={bank}&amount={amount}&des={content}&template=compact").strip()
-SEPAY_PACKAGES = {30: 50000, 60: 100000, 90: 150000}
+SEPAY_PACKAGES = {30: 2000, 60: 100000, 90: 150000}
 PAYMENT_GATEWAYS = ('sepay',)
 SEPAY_FREE_LIMIT = int(os.getenv('SEPAY_FREE_LIMIT', '50') or 50)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
@@ -347,6 +350,32 @@ def notify_telegram_text(message):
         app.logger.warning("Telegram notification error: %s", exc)
         return False
 
+def notify_zalo_room_started(info):
+    if not ZALO_BOT_TOKEN or not ZALO_CHAT_ID:
+        return False
+    mode = str(info.get('mode') or '').strip()
+    option = str(info.get('option') or info.get('map') or '').strip()
+    map_name = option or mode or 'Không rõ'
+    message = (
+        '▶ BẮT ĐẦU AUTO\n\n'
+        f"Mode: {mode or 'Không rõ'}\n"
+        f"ID: {info.get('machine_id', '')}\n"
+        f"Map: {map_name}\n"
+        f"Thời gian: {now_vn().strftime('%d/%m/%Y %H:%M:%S')}"
+    )
+    try:
+        response = requests.post(
+            f"https://bot-api.zaloplatforms.com/bot{ZALO_BOT_TOKEN}/sendMessage",
+            json={'chat_id': ZALO_CHAT_ID, 'text': message},
+            timeout=8,
+        )
+        result = response.json()
+        if response.ok and result.get('ok') is not False:
+            return True
+        app.logger.warning('Zalo room notification failed: %s', response.text[:300])
+    except Exception as exc:
+        app.logger.warning('Zalo room notification error: %s', exc)
+    return False
 def notify_telegram_sepay_exhausted(month_key, used, limit):
     return notify_telegram_text(
         "⚠️ SEPAY HẾT LƯỢT\n"
@@ -456,7 +485,26 @@ def load_room_info():
     try:
         with open(ROOM_INFO_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        if not isinstance(data, dict):
+            return {}
+        now = now_vn()
+        active = {}
+        for machine_id, info in data.items():
+            if not isinstance(info, dict):
+                continue
+            try:
+                last_seen = datetime.fromisoformat(str(info.get('updated_at', '')))
+                if last_seen.tzinfo is None:
+                    last_seen = last_seen.replace(tzinfo=TZ_VN)
+                fresh = (now - last_seen).total_seconds() <= ROOM_INFO_TIMEOUT_SECONDS
+            except (TypeError, ValueError):
+                fresh = False
+            if fresh:
+                active[machine_id] = info
+        if len(active) != len(data):
+            with open(ROOM_INFO_FILE, 'w', encoding='utf-8') as f:
+                json.dump(active, f, ensure_ascii=False, indent=2)
+        return active
     except Exception:
         return {}
 
@@ -1913,21 +1961,33 @@ def find_license_name(machine_id):
 def build_room_info_rows():
     data = load_room_info()
     rows = []
+    now = now_vn()
     for machine_id, info in data.items():
         if not isinstance(info, dict):
             continue
+        updated_at = info.get('updated_at', '')
+        stale = False
+        try:
+            last_seen = datetime.fromisoformat(str(updated_at))
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=TZ_VN)
+            stale = (now - last_seen).total_seconds() > ROOM_INFO_TIMEOUT_SECONDS
+        except (TypeError, ValueError):
+            stale = True
         rows.append({
             'machine_id': machine_id,
             'name': str(info.get('name') or find_license_name(machine_id) or '').strip(),
             'mode': str(info.get('mode', '')).strip(),
+            'option': str(info.get('option') or info.get('map') or '').strip(),
             'tudo': str(info.get('tudo', '')).strip(),
             'kenh': str(info.get('kenh', '')).strip(),
             'phong': str(info.get('phong', '')).strip(),
             'password': str(info.get('password', '')).strip(),
-            'status': str(info.get('status', '')).strip(),
+            'status': 'Mất kết nối' if stale else str(info.get('status', '')).strip(),
             'device_id': str(info.get('device_id', '')).strip(),
             'device_name': str(info.get('device_name', '')).strip(),
-            'updated_at': info.get('updated_at', '')
+            'updated_at': updated_at,
+            'stale': stale,
         })
     rows.sort(key=lambda item: item.get('updated_at', ''), reverse=True)
     return rows
@@ -2604,6 +2664,7 @@ def update_room_info():
         'machine_id': machine_id,
         'name': str(data.get('name') or current.get('name') or find_license_name(machine_id) or '').strip(),
         'mode': str(data.get('mode', current.get('mode', ''))).strip()[:40],
+        'option': str(data.get('option', data.get('map', current.get('option', '')))).strip()[:60],
         'tudo': str(data.get('tudo', current.get('tudo', ''))).strip()[:10],
         'kenh': str(data.get('kenh', current.get('kenh', ''))).strip()[:10],
         'phong': str(data.get('phong', current.get('phong', ''))).strip()[:10],
@@ -2611,10 +2672,15 @@ def update_room_info():
         'status': str(data.get('status', current.get('status', ''))).strip()[:40],
         'device_id': str(data.get('device_id', current.get('device_id', ''))).strip(),
         'device_name': str(data.get('device_name', current.get('device_name', ''))).strip(),
+        'zalo_notified_at': str(current.get('zalo_notified_at', '')).strip(),
         'updated_at': now_vn().isoformat()
     }
+    record = rooms[machine_id]
+    is_new_session = not current.get('zalo_notified_at')
+    if is_new_session and notify_zalo_room_started(record):
+        record['zalo_notified_at'] = now_vn().isoformat()
     save_room_info(rooms)
-    return jsonify({'success': True, **rooms[machine_id]}), 200
+    return jsonify({'success': True, **record}), 200
 
 @app.route('/files', methods=['GET'])
 def list_files():
