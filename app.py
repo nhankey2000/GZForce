@@ -353,11 +353,15 @@ def notify_telegram_text(message):
 def notify_zalo_room_started(info):
     if not ZALO_BOT_TOKEN or not ZALO_CHAT_ID:
         return False
+    if load_config().get('zalo_share_room', True) is False:
+        return False
     mode = str(info.get('mode') or '').strip()
+    if mode != 'Xả Thẻ':
+        return False
     option = str(info.get('option') or info.get('map') or '').strip()
     map_name = option or mode or 'Không rõ'
     message = (
-        '▶ BẮT ĐẦU AUTO\n\n'
+        '🔔 THÔNG BÁO\n\n'
         f"Mode: {mode or 'Không rõ'}\n"
         f"ID: {info.get('machine_id', '')}\n"
         f"Map: {map_name}\n"
@@ -600,12 +604,19 @@ def normalize_callboss_account(item, index=0):
 
 def load_config():
     if github_enabled():
-        data = persistent_json_read(CONFIG_FILE, {'room_name': ''})
-        return data if isinstance(data, dict) else {'room_name': ''}
+        data = persistent_json_read(CONFIG_FILE, {'room_name': '', 'zalo_share_room': True})
+        if not isinstance(data, dict):
+            data = {'room_name': '', 'zalo_share_room': True}
+        data.setdefault('zalo_share_room', True)
+        return data
     if not os.path.exists(CONFIG_FILE):
-        return {'room_name': ''}
+        return {'room_name': '', 'zalo_share_room': True}
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        data = json.load(f)
+    if not isinstance(data, dict):
+        data = {'room_name': ''}
+    data.setdefault('zalo_share_room', True)
+    return data
 
 def save_config(cfg):
     if persistent_json_write(CONFIG_FILE, cfg, "Update app config"):
@@ -1139,6 +1150,15 @@ HTML = """
       <div class="section-title" style="margin-bottom:20px">⚙ Cấu Hình Hệ Thống</div>
       <div class="settings-grid">
         <div class="setting-item">
+          <div class="section-title" style="margin-bottom:8px">📣 Chia Sẻ Zalo</div>
+          <div class="setting-desc">Cho phép gửi thông báo ID mode Xả Thẻ đến nhóm Zalo.</div>
+          <label style="display:flex;align-items:center;gap:10px;margin-top:16px;font-weight:700;color:var(--text)">
+            <input type="checkbox" id="inp-zalo-share-room" style="width:18px;height:18px;accent-color:var(--orange)" />
+            Bật Share ID Xả Thẻ
+          </label>
+          <button class="btn btn-orange" style="margin-top:12px;width:100%" onclick="saveZaloShareRoom()">💾 LƯU CẤU HÌNH ZALO</button>
+        </div>
+        <div class="setting-item">
           <div class="section-title" style="margin-bottom:8px">🏠 Tên Phòng</div>
           <div class="setting-desc">Tên phòng chung trả về khi client gọi <code style="color:var(--orange)">/check-key</code>.</div>
           <div class="form-group">
@@ -1430,6 +1450,8 @@ async function loadConfig() {
   const releaseNotes = versionCfg.release_notes || '';
   const updaterVersion = versionCfg.updater_version || '';
   document.getElementById('inp-room-name').value = room;
+  const zaloShare = document.getElementById('inp-zalo-share-room');
+  if (zaloShare) zaloShare.checked = cfg.zalo_share_room !== false;
   document.getElementById('inp-version').value = version;
   document.getElementById('inp-release-notes').value = releaseNotes;
   document.getElementById('inp-updater-version').value = updaterVersion;
@@ -1455,6 +1477,12 @@ async function saveRoomName() {
   const res = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({room_name: room}) });
   if (res.ok) { showToast('✓ Đã lưu tên phòng', 'success'); loadConfig(); }
   else showToast('❌ Lỗi lưu config', 'error');
+}
+async function saveZaloShareRoom() {
+  const enabled = document.getElementById('inp-zalo-share-room').checked;
+  const res = await fetch('/config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({zalo_share_room: enabled}) });
+  if (res.ok) { showToast('✓ Đã lưu cấu hình Zalo', 'success'); loadConfig(); }
+  else showToast('❌ Lỗi lưu cấu hình Zalo', 'error');
 }
 async function loadLicenses() {
   const tbody = document.getElementById('license-tbody');
@@ -1739,9 +1767,12 @@ def get_config():
 def set_config():
     data = request.json
     cfg = load_config()
-    cfg['room_name'] = data.get('room_name', '')
+    if 'room_name' in data:
+        cfg['room_name'] = data.get('room_name', '')
+    if 'zalo_share_room' in data:
+        cfg['zalo_share_room'] = bool(data.get('zalo_share_room'))
     save_config(cfg)
-    return jsonify({'success': True, 'room_name': cfg['room_name']})
+    return jsonify({'success': True, **cfg})
 
 @app.route('/version', methods=['GET'])
 def get_version():
